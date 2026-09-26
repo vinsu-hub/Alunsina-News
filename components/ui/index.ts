@@ -8,3 +8,5 @@ export * from "./StoryCard";
 export * from "./Icon";
 export * from "./CoverageBreakdown";
 export * from "./SaveButton";
+export * from "./CoverageChip";
+export * from "./StoryImage";

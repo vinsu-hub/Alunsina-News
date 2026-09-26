@@ -52,3 +52,10 @@ export const BLINDSPOT_RULES = {
     text: "A claim is tracked as circulating on social media and no independent outlet or fact-checker has addressed it. Suppressed as soon as a fact-check is linked.",
   },
 } as const;
+
+/** Related Stories: separate Stories in the same ongoing situation over time (not the same event). */
+export const RELATED_STORIES = {
+  maxGapDays: 14,
+  minConfidenceShown: 0.6,
+  text: "Two Stories are linked as related when they share named people, places, or institutions and the same topic, and were reported within 14 days of each other, but are different events. Each link gets a confidence score; only links scoring 0.6 or higher are shown.",
+} as const;
