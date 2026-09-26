@@ -287,10 +287,9 @@ export function PhilippineCoverage({
 
           <div className="min-w-0">
             <CoverageBreakdown
-              key={`${mode}-${listKey}`}
               coverage={shown}
               regionHref={regionHref}
-              initialIsland={island}
+              island={island}
               onIslandChange={setIsland}
             />
             <ComparisonNote

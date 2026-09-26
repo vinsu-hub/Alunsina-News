@@ -13,14 +13,18 @@ export function CoverageBreakdown({
   coverage,
   regionHref,
   initialIsland = null,
+  island,
   onIslandChange,
 }: {
   coverage: IslandCoverage[];
   regionHref?: (regionId: string) => string;
   initialIsland?: IslandGroupId | null;
+  /** Controlled open island; when provided, overrides internal state. */
+  island?: IslandGroupId | null;
   onIslandChange?: (island: IslandGroupId | null) => void;
 }) {
-  const [open, setOpen] = useState<IslandGroupId | null>(initialIsland);
+  const [openState, setOpen] = useState<IslandGroupId | null>(initialIsland);
+  const open = island !== undefined ? island : openState;
   const toggle = (id: IslandGroupId) => {
     const next = open === id ? null : id;
     setOpen(next);
