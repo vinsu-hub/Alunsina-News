@@ -1,0 +1,14 @@
+# Common rules for Codex UI/UX workers (ALUNSINA NEWS)
+
+Repo: /Users/vincetamis/Desktop/VARIX/Alunsina News (Next.js 16.3 App Router, React 19, Tailwind 4, SQLite via node:sqlite).
+Read first: `docs/SPEC.md` (product requirements), `docs/BUILD_BRIEF.md` (shared modules + conventions), `AGENTS.md` (Next 16 has breaking changes: `params`/`searchParams` are Promises; check `node_modules/next/dist/docs/` when unsure).
+
+- A dev server is ALREADY running at http://localhost:3100 against this checkout. Use it. Do NOT start another `next dev` or run `next build` (they fight over `.next/`). Data comes from `data/alunsina.db` (sample edition; fictional "(sample)" publishers). Do not run `npm run seed` or `npm run ingest`.
+- Several workers edit this same checkout in parallel. Edit ONLY the paths your task owns. Do NOT `git commit`, `git add`, `git stash`, or `git checkout`. The coordinator commits.
+- Shared primitives (`components/ui/*`, `lib/*.ts`, `app/globals.css`, `components/layout/*`) are owned by the Visual-system worker only. Others: if you need a change there, build a local component in your own folder, and note the request in your worker_done summary.
+- Design bar (§9–11): digital Philippine broadsheet + editorial intelligence. Serif headlines (Newsreader), Inter UI, thin rules, double section rules, multi-column, compact tabular meta, square corners (≤2px), no shadows/gradients/neon, no political color coding, no bias meters. Tokens: paper, paper-deep, ink, ink-soft, ink-muted, forest, forest-dark, terracotta, ochre, rule. Utilities: kicker, section-head, headline, meta, link-quiet.
+- Trust rules: always "Potential Blindspot" + why; always "Read on [Publisher] ↗" outbound (never full article text); paywalled → "Subscription required"; ownership stated factually; never rate social claims true/false.
+- Responsive: verify at 1440×900 and 390×844. No horizontal page scroll at 390 (check `document.documentElement.scrollWidth <= innerWidth`). Mobile bottom tab bar is fixed; content must not hide behind it.
+- Accessibility: semantic headings in order, labelled controls, keyboard-operable toggles, visible focus, `aria-expanded`/`aria-pressed`/`aria-current` where relevant, color contrast AA for text.
+- Verify with a real browser (Playwright is installed: `npx playwright screenshot` or a small node script using `playwright`; if browsers are missing run `npx playwright install chromium`). Save screenshots to `.playwright-mcp/codex-<task>-<page>-<width>.png`.
+- Before worker_done: `npx tsc --noEmit` clean; `npx eslint <your paths>` clean; curl each of your routes → 200 with no new errors in `/private/tmp/claude-501/-Users-vincetamis-Desktop-VARIX-Alunsina-News/2b4dd8be-ce03-4c97-ac50-b75d601ff21c/scratchpad/dev.log`. List changed files with `--files-modified`.
