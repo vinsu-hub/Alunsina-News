@@ -32,8 +32,9 @@ export const BLINDSPOT_RULES = {
   },
   timing: {
     maxAgeHours: 6,
+    minSources: 3,
     maxIndependentOrRegional: 1,
-    text: "The story is under 6 hours old and has at most 1 independent or regional report so far.",
+    text: "The story is under 6 hours old, is already covered by at least 3 sources, and has at most 1 independent or regional report so far.",
   },
   local: {
     minArticles: 5,

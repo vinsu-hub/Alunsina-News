@@ -20,6 +20,8 @@ export interface FeedSource {
   /** Fact-check publisher: items become `fact_checks` rows, not articles. */
   factCheck?: boolean;
   verified: boolean; // set by scripts/check-feeds.ts output review
+  /** Why a source has no working feed (shown nowhere in UI; for ops). */
+  feedNote?: string;
 }
 
 export const FEEDS: FeedSource[] = [
@@ -36,7 +38,7 @@ export const FEEDS: FeedSource[] = [
     paywalled: false,
     regions: ["ncr"],
     languages: ["en"],
-    verified: false,
+    verified: true,
   },
   {
     id: "gma-news",
@@ -49,7 +51,7 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en", "fil"],
-    verified: false,
+    verified: true,
   },
   {
     id: "philstar",
@@ -62,33 +64,34 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en"],
-    verified: false,
+    verified: true,
   },
   {
     id: "abs-cbn",
     name: "ABS-CBN News",
     type: "national",
     homepage: "https://www.abs-cbn.com/news",
-    feeds: ["https://www.abs-cbn.com/rss/news"],
+    feeds: ["https://www.abs-cbn.com/feed/"],
     ownership: "ABS-CBN Corporation (Lopez Group)",
     ownershipSource: "ABS-CBN corporate filings (PSE)",
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en", "fil"],
-    verified: false,
+    verified: true,
   },
   {
     id: "manila-bulletin",
     name: "Manila Bulletin",
     type: "national",
     homepage: "https://mb.com.ph",
-    feeds: ["https://mb.com.ph/rss/news"],
+    feeds: [],
     ownership: "Manila Bulletin Publishing Corporation",
     ownershipSource: "Publisher's About page",
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en"],
     verified: false,
+    feedNote: "HTTP 403 (bot-blocked) as of 2026-09-27; candidate for a data partnership",
   },
   {
     id: "manila-times",
@@ -102,7 +105,7 @@ export const FEEDS: FeedSource[] = [
     paywalled: true,
     regions: ["ncr"],
     languages: ["en"],
-    verified: false,
+    verified: true,
   },
   {
     id: "manila-standard",
@@ -115,7 +118,7 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en"],
-    verified: false,
+    verified: true,
   },
   {
     id: "businessworld",
@@ -129,14 +132,14 @@ export const FEEDS: FeedSource[] = [
     regions: ["ncr"],
     languages: ["en"],
     topics: ["Economy", "Business"],
-    verified: false,
+    verified: true,
   },
   {
     id: "businessmirror",
     name: "BusinessMirror",
     type: "national",
     homepage: "https://businessmirror.com.ph",
-    feeds: ["https://businessmirror.com.ph/feed/"],
+    feeds: [],
     ownership: "Philippine Business Daily Mirror Publishing, Inc.",
     ownershipSource: "Publisher's About page",
     dataStatus: "feed",
@@ -144,19 +147,20 @@ export const FEEDS: FeedSource[] = [
     languages: ["en"],
     topics: ["Economy", "Business"],
     verified: false,
+    feedNote: "HTTP 403 (bot-blocked) as of 2026-09-27; candidate for a data partnership",
   },
   {
     id: "abante",
     name: "Abante",
     type: "national",
     homepage: "https://www.abante.com.ph",
-    feeds: ["https://www.abante.com.ph/feed/"],
+    feeds: ["https://www.abante.com.ph/rss.xml"],
     ownership: "Monica Publishing Corporation",
     ownershipSource: "Publisher's About page",
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["fil"],
-    verified: false,
+    verified: true,
   },
 
   // ---- Independent ----
@@ -171,7 +175,7 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en", "fil"],
-    verified: false,
+    verified: true,
   },
   {
     id: "pcij",
@@ -184,7 +188,7 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en"],
-    verified: false,
+    verified: true,
   },
   {
     id: "bulatlat",
@@ -197,20 +201,21 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en", "fil"],
-    verified: false,
+    verified: true,
   },
   {
     id: "mindanews",
     name: "MindaNews",
     type: "independent",
     homepage: "https://www.mindanews.com",
-    feeds: ["https://www.mindanews.com/feed/"],
+    feeds: [],
     ownership: "Mindanao News and Information Cooperative Center",
     ownershipSource: "MindaNews About page",
     dataStatus: "feed",
     regions: ["r11", "r10", "r12", "barmm", "r9", "r13"],
     languages: ["en"],
     verified: false,
+    feedNote: "HTTP 403 (bot-blocked) as of 2026-09-27; candidate for a data partnership",
   },
 
   // ---- Fact-checkers (feed items become fact_checks, used to suppress Social blindspots) ----
@@ -219,7 +224,7 @@ export const FEEDS: FeedSource[] = [
     name: "VERA Files",
     type: "independent",
     homepage: "https://verafiles.org",
-    feeds: ["https://verafiles.org/feed"],
+    feeds: [],
     ownership: "Nonprofit media organization",
     ownershipSource: "VERA Files About page",
     dataStatus: "feed",
@@ -227,6 +232,7 @@ export const FEEDS: FeedSource[] = [
     languages: ["en", "fil"],
     factCheck: true,
     verified: false,
+    feedNote: "no RSS document found as of 2026-09-27; candidate for a data partnership",
   },
   {
     id: "rappler-factcheck",
@@ -240,7 +246,7 @@ export const FEEDS: FeedSource[] = [
     regions: ["ncr"],
     languages: ["en", "fil"],
     factCheck: true,
-    verified: false,
+    verified: true,
   },
 
   // ---- State-Run Media ----
@@ -249,13 +255,14 @@ export const FEEDS: FeedSource[] = [
     name: "Philippine News Agency",
     type: "state",
     homepage: "https://www.pna.gov.ph",
-    feeds: ["https://www.pna.gov.ph/latest.rss"],
+    feeds: [],
     ownership: "Government of the Philippines (Presidential Communications Office)",
     ownershipSource: "PNA About page",
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en"],
     verified: false,
+    feedNote: "HTTP 404, no feed discovered as of 2026-09-27; candidate for a data partnership",
   },
   {
     id: "ptv",
@@ -268,7 +275,7 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en", "fil"],
-    verified: false,
+    verified: true,
   },
 
   // ---- Government Statement ----
@@ -277,13 +284,14 @@ export const FEEDS: FeedSource[] = [
     name: "Philippine Information Agency",
     type: "government",
     homepage: "https://pia.gov.ph",
-    feeds: ["https://pia.gov.ph/rss"],
+    feeds: [],
     ownership: "Government of the Philippines (attached agency, PCO)",
     ownershipSource: "PIA About page",
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en", "fil"],
     verified: false,
+    feedNote: "HTTP 403 (bot-blocked) as of 2026-09-27; candidate for a data partnership",
   },
   {
     id: "senate",
@@ -297,6 +305,7 @@ export const FEEDS: FeedSource[] = [
     regions: ["ncr"],
     languages: ["en"],
     verified: false,
+    feedNote: "no public feed as of 2026-09-27; candidate for a data partnership",
   },
 
   // ---- Primary Document ----
@@ -311,7 +320,7 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en"],
-    verified: false,
+    verified: true,
   },
 
   // ---- Regional Media ----
@@ -320,13 +329,13 @@ export const FEEDS: FeedSource[] = [
     name: "SunStar",
     type: "regional",
     homepage: "https://www.sunstar.com.ph",
-    feeds: ["https://www.sunstar.com.ph/rss"],
+    feeds: ["https://www.sunstar.com.ph/feed/"],
     ownership: "SunStar Publishing, Inc.",
     ownershipSource: "SunStar About page",
     dataStatus: "feed",
     regions: ["r7", "r11", "r10", "r3", "car", "nir"],
     languages: ["en", "ceb"],
-    verified: false,
+    verified: true,
   },
   {
     id: "panay-news",
@@ -339,20 +348,21 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["r6"],
     languages: ["en", "hil"],
-    verified: false,
+    verified: true,
   },
   {
     id: "daily-guardian",
     name: "Daily Guardian",
     type: "regional",
     homepage: "https://dailyguardian.com.ph",
-    feeds: ["https://dailyguardian.com.ph/feed/"],
+    feeds: [],
     ownership: "Independently owned",
     ownershipSource: "Publisher's About page",
     dataStatus: "feed",
     regions: ["r6"],
     languages: ["en"],
     verified: false,
+    feedNote: "HTTP 403 (bot-blocked) as of 2026-09-27; candidate for a data partnership",
   },
   {
     id: "mindanao-times",
@@ -365,7 +375,7 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["r11"],
     languages: ["en"],
-    verified: false,
+    verified: true,
   },
   {
     id: "edge-davao",
@@ -378,7 +388,7 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["r11"],
     languages: ["en"],
-    verified: false,
+    verified: true,
   },
   {
     id: "punto",
@@ -391,20 +401,21 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["r3"],
     languages: ["en", "fil"],
-    verified: false,
+    verified: true,
   },
   {
     id: "baguio-midland",
     name: "Baguio Midland Courier",
     type: "regional",
     homepage: "https://www.baguiomidlandcourier.com.ph",
-    feeds: ["https://www.baguiomidlandcourier.com.ph/feed/"],
+    feeds: [],
     ownership: "Independently owned",
     ownershipSource: "Publisher's About page",
     dataStatus: "feed",
     regions: ["car"],
     languages: ["en"],
     verified: false,
+    feedNote: "connection failed as of 2026-09-27; candidate for a data partnership",
   },
 
   // ---- Community ----
@@ -413,12 +424,13 @@ export const FEEDS: FeedSource[] = [
     name: "Northern Dispatch",
     type: "community",
     homepage: "https://nordis.net",
-    feeds: ["https://nordis.net/feed/"],
+    feeds: [],
     ownership: "Community-based media organization",
     ownershipSource: "Nordis About page",
     dataStatus: "feed",
     regions: ["car", "r1", "r2"],
     languages: ["en", "ilo"],
     verified: false,
+    feedNote: "HTTP 429 (rate-limited) as of 2026-09-27; candidate for a data partnership",
   },
 ];

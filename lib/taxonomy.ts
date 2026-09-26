@@ -136,6 +136,7 @@ export const TOPICS = [
   "Climate",
   "Justice",
   "Foreign Affairs",
+  "Sports",
 ] as const;
 export type Topic = (typeof TOPICS)[number];
 export const topicSlug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-");
