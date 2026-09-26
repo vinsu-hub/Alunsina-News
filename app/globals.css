@@ -2,15 +2,15 @@
 
 /* ALUNSINA NEWS design tokens (§10). Editorial, restrained; no political coding. */
 :root {
-  --paper: #f4f1e8;
+  --paper: #f5f3ea;
   --paper-deep: #ebe6d8;
-  --ink: #1e211e;
+  --ink: #17201f;
   --ink-soft: #4a4d47;
-  --ink-muted: #66695f;
-  --forest: #123f35;
+  --ink-muted: #68706d;
+  --forest: #123b36;
   --forest-dark: #092d27;
-  --terracotta: #b4513d;
-  --ochre: #c49a45;
+  --terracotta: #b95532;
+  --ochre: #b49a62;
   --rule: #c9c5b9;
 }
 
@@ -97,6 +97,66 @@ body {
 @media (max-width: 767px) {
   .nav-edge ul {
     padding-right: 2rem;
-    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(
+      to right,
+      #000 0,
+      #000 calc(100% - 24px),
+      transparent 100%
+    );
+  }
+}
+
+/* Homepage follows the editorial reading order on narrow screens. */
+.home-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-areas: "lead" "briefing" "blindspots" "coverage" "local" "magnified" "top";
+}
+.home-briefing {
+  grid-area: briefing;
+  align-self: start;
+}
+.home-lead {
+  grid-area: lead;
+}
+.home-blindspots {
+  grid-area: blindspots;
+  align-self: start;
+}
+.home-coverage {
+  grid-area: coverage;
+}
+.home-magnified {
+  grid-area: magnified;
+}
+.home-local {
+  grid-area: local;
+}
+.home-top {
+  grid-area: top;
+}
+.homepage .section-head {
+  border-top: 0;
+  padding-top: 0;
+}
+.homepage .section-head::after {
+  border-color: var(--rule);
+}
+.homepage .section-head h2 {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  letter-spacing: 0;
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .home-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "lead lead" "briefing blindspots" "coverage magnified" "local local" "top top";
+  }
+}
+@media (min-width: 1024px) {
+  .home-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-areas: "briefing briefing lead lead lead lead blindspots blindspots" "briefing briefing lead lead lead lead local local" "briefing briefing coverage coverage magnified magnified local local" "top top top top top top local local";
+    gap: 16px;
   }
 }

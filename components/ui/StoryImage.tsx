@@ -24,7 +24,10 @@ export function StoryImage({
 }) {
   return (
     <figure className={className}>
-      <div className="relative w-full overflow-hidden bg-paper-deep" style={{ aspectRatio: ratio }}>
+      <div
+        className="relative w-full overflow-hidden bg-paper-deep"
+        style={{ aspectRatio: ratio }}
+      >
         {image?.url ? (
           // Remote publisher images vary by host; a plain <img> avoids allow-listing every domain.
           // eslint-disable-next-line @next/next/no-img-element
@@ -41,7 +44,9 @@ export function StoryImage({
         )}
       </div>
       {showCredit && image?.url && (
-        <figcaption className="mt-1 font-sans text-[10px] uppercase tracking-wide text-ink-muted">Photo: {image.credit}</figcaption>
+        <figcaption className="mt-1 font-sans text-[10px] uppercase tracking-wide text-ink-muted">
+          Photo: {image.credit}
+        </figcaption>
       )}
     </figure>
   );
@@ -52,7 +57,7 @@ function Placeholder({ topic }: { topic?: string }) {
     <div
       aria-hidden
       data-topic={topic ? topicSlug(topic) : undefined}
-      className="absolute inset-0 flex items-end bg-[repeating-linear-gradient(135deg,transparent_0_10px,rgb(201_197_185/0.35)_10px_11px)] p-3"
+      className="absolute inset-0 flex items-end bg-paper-deep p-3"
     >
       {topic && <span className="kicker text-ink-muted/80">{topic}</span>}
     </div>

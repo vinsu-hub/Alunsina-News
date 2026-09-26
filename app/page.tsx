@@ -1,114 +1,110 @@
 import Link from "next/link";
-import { getEdition } from "@/lib/queries";
-import { StoryCard } from "@/components/ui";
+import { getEdition, getMagnifiedNews } from "@/lib/queries";
+import { CoverageChip } from "@/components/ui/CoverageChip";
+import { StoryImage } from "@/components/ui/StoryImage";
 import { DailyBriefing } from "@/components/home/DailyBriefing";
 import { LeadStory } from "@/components/home/LeadStory";
 import { BlindspotRail } from "@/components/home/BlindspotRail";
 import { EmphasisSection } from "@/components/home/EmphasisSection";
-import { AdSlot } from "@/components/home/AdSlot";
 import { MyAreaTeaser } from "@/components/home/MyAreaTeaser";
-import { PhilippineCoverage } from "@/components/coverage/PhilippineCoverage";
-
-// Front page (§13). Opens straight into news; no hero.
+import { MagnifiedNews } from "@/components/home/MagnifiedNews";
+import {
+  PhilippineCoverage,
+  CompactCoverage,
+} from "@/components/coverage/PhilippineCoverage";
+import { Emblem } from "@/components/ui/Emblem";
+import { timeAgo } from "@/lib/format";
 export default async function Home() {
-  const e = await getEdition();
-  const lead = e.lead;
-
+  const [e, luzon, visayas, mindanao] = await Promise.all([
+    getEdition(),
+    getMagnifiedNews("luzon"),
+    getMagnifiedNews("visayas"),
+    getMagnifiedNews("mindanao"),
+  ]);
   return (
-    <div className="mx-auto max-w-[1280px] px-4 pt-6 pb-12 md:px-6 md:pt-8">
+    <div className="homepage mx-auto max-w-[1440px] px-4 pb-10 pt-4 md:px-6">
       <h1 className="sr-only">ALUNSINA NEWS: today&apos;s edition</h1>
-
-      {/* Top band: Briefing | Lead | Blindspots. Mobile order: Lead → Briefing → Blindspots. */}
-      <div className="grid gap-y-10 lg:grid-cols-12 lg:gap-x-0">
-        <div className="order-2 lg:order-1 lg:col-span-3 lg:border-r lg:border-rule lg:pr-6">
+      <div className="home-grid">
+        <div className="home-briefing border border-rule p-3">
           <DailyBriefing stories={e.briefing} />
         </div>
-        <div className="order-1 lg:order-2 lg:col-span-6 lg:px-7">
-          {lead ? (
-            <LeadStory story={lead} />
+        <div className="home-lead min-w-0">
+          {e.lead ? (
+            <>
+              <LeadStory story={e.lead} />
+              <EmphasisSection story={e.lead} />
+            </>
           ) : (
-            <p className="headline border-t-[3px] border-ink pt-3 text-2xl">Today&apos;s edition is being assembled.</p>
+            <p className="headline text-2xl">
+              Today&apos;s edition is being assembled.
+            </p>
           )}
         </div>
-        <aside className="order-3 lg:col-span-3 lg:border-l lg:border-rule lg:pl-6" aria-label="Potential blindspots">
+        <aside
+          className="home-blindspots border border-rule p-3"
+          aria-label="Potential blindspots"
+        >
           <BlindspotRail blindspots={e.blindspots} />
         </aside>
-      </div>
-
-      {/* Featured story cards */}
-      {e.featured.length > 0 && (
-        <section aria-labelledby="featured-title" className="mt-12">
-          <header className="section-head mb-5">
-            <h2 id="featured-title" className="kicker mt-2 text-ink">
-              Featured Stories
-            </h2>
-          </header>
-          <div className="grid gap-y-8 md:grid-cols-3 md:divide-x md:divide-rule">
-            {e.featured.map((s) => (
-              <StoryCard key={s.id} story={s} className="md:px-6 md:first:pl-0 md:last:pr-0" />
-            ))}
+        <div className="home-coverage min-w-0">
+          <PhilippineCoverage coverage={e.coverage} id="coverage" />
+        </div>
+        <div className="home-magnified min-w-0">
+          <MagnifiedNews entries={{ luzon, visayas, mindanao }} />
+        </div>
+        <aside
+          className="home-local min-w-0 space-y-3"
+          aria-label="Regional and local coverage"
+        >
+          <div className="hidden lg:block">
+            <CompactCoverage coverage={e.coverage} />
           </div>
-        </section>
-      )}
-
-      {/* Ad slot: main column only, between Featured and the lower sections — never in the right rail. */}
-      <AdSlot className="mt-12" />
-
-      {lead && (
-        <div className="mt-12">
-          <EmphasisSection story={lead} />
-        </div>
-      )}
-
-      {/* Coverage + My Area side by side (ad-free rail). */}
-      <div className="mt-12 grid gap-10 lg:grid-cols-12 lg:gap-x-8">
-        <div className="min-w-0 lg:col-span-8">
-          <PhilippineCoverage
-            id="coverage"
-            coverage={lead ? lead.coverage : e.coverage}
-            compareTo={lead ? e.coverage : undefined}
-            sub={
-              lead ? (
-                <>
-                  Where{" "}
-                  <Link href={`/story/${lead.id}`} className="link-quiet not-italic text-ink">
-                    &ldquo;{lead.title}&rdquo;
-                  </Link>{" "}
-                  is being reported
-                </>
-              ) : (
-                "Where today's stories are being reported"
-              )
-            }
-          />
-        </div>
-        <aside className="lg:col-span-4" aria-label="My Area">
           <MyAreaTeaser />
+          <div className="bg-forest p-5 text-paper">
+            <p className="font-serif text-xl leading-snug">
+              Better information builds a stronger Philippines.
+            </p>
+            <p className="mt-4 flex items-center gap-2 font-serif text-sm">
+              <Emblem /> ALUNSINA NEWS
+            </p>
+          </div>
         </aside>
-      </div>
-
-      {/* Top News Stories */}
-      {e.topStories.length > 0 && (
-        <section aria-labelledby="top-title" className="mt-12">
-          <header className="section-head mb-2">
-            <div className="mt-2 flex items-baseline justify-between gap-4">
-              <h2 id="top-title" className="kicker text-ink">
-                Top News Stories
-              </h2>
-              <Link href="/explore" className="meta link-quiet">
-                Explore all stories →
-              </Link>
-            </div>
+        <section
+          className="home-top min-w-0 border border-rule p-3"
+          aria-labelledby="top-title"
+        >
+          <header className="mb-3 flex justify-between border-b border-rule pb-2">
+            <h2 id="top-title" className="font-serif text-xl uppercase">
+              Top News Stories
+            </h2>
+            <Link href="/explore" className="text-xs text-forest">
+              View all →
+            </Link>
           </header>
-          <ul className="grid md:grid-cols-2 md:gap-x-8 lg:grid-cols-3">
-            {e.topStories.map((s) => (
-              <li key={s.id} className="border-b border-rule py-4">
-                <StoryCard story={s} variant="compact" />
+          <ul className="no-scrollbar flex gap-4 overflow-x-auto md:grid md:grid-cols-5">
+            {e.topStories.slice(0, 5).map((s) => (
+              <li key={s.id} className="min-w-0 w-[230px] shrink-0 md:w-auto">
+                <StoryImage
+                  image={s.leadImage}
+                  alt={s.title}
+                  topic={s.topic}
+                  ratio="4/3"
+                />
+                <p className="kicker mt-2 text-[9px] text-forest">{s.topic}</p>
+                <h3 className="headline mt-1 text-[18px] leading-snug">
+                  <Link href={`/story/${s.id}`}>{s.title}</Link>
+                </h3>
+                <CoverageChip
+                  storyId={s.id}
+                  stats={s.stats}
+                  className="mt-2 flex-wrap text-[10px]"
+                />
+                <p className="meta mt-1 text-[10px]">{timeAgo(s.updatedAt)}</p>
               </li>
             ))}
           </ul>
         </section>
-      )}
+      </div>
     </div>
   );
 }

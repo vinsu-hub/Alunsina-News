@@ -1,44 +1,57 @@
 import Link from "next/link";
 import { editionDate } from "@/lib/format";
 import { Icon } from "@/components/ui";
-
-/** Newspaper masthead (§12). Brand is always the full "ALUNSINA NEWS" — never an acronym. */
+import { Emblem } from "@/components/ui/Emblem";
 export function Masthead() {
   return (
-    <div className="mx-auto max-w-[1280px] px-4 md:px-6">
-      <div className="grid grid-cols-[1fr_auto] items-center gap-2 pt-3 pb-3 md:grid-cols-[1fr_auto_1fr] md:gap-4 md:pt-6">
-        <div className="hidden font-sans text-[10px] font-semibold uppercase leading-[1.5] tracking-[0.16em] text-ink-soft md:block">
-          <div>Philippines</div>
-          <div>Daily Edition</div>
-          <div className="text-ink">{editionDate()}</div>
-        </div>
-        
-        <div className="min-w-0 text-left md:text-center">
-          <Link href="/" className="block" aria-label="ALUNSINA NEWS — home">
-            <span className="block font-serif whitespace-nowrap text-[32px] font-semibold leading-none tracking-[-0.02em] text-forest-dark sm:text-5xl md:text-[64px]">
-              ALUNSINA NEWS
-            </span>
+    <div className="mx-auto max-w-[1440px] px-4 md:px-6">
+      <div className="relative grid items-center gap-4 py-5 lg:grid-cols-[1fr_1.3fr_1fr] lg:py-6">
+        <p className="hidden self-start pt-2 text-[9px] uppercase tracking-wider lg:block">
+          Philippines · Daily edition · {editionDate()}
+        </p>
+        <div className="text-center">
+          <Emblem className="mx-auto mb-2 text-forest" />
+          <Link
+            href="/"
+            aria-label="ALUNSINA NEWS — home"
+            className="block whitespace-nowrap font-serif text-[35px] font-semibold leading-none tracking-tight text-forest-dark sm:text-[52px]"
+          >
+            ALUNSINA NEWS
           </Link>
-          <p className="mt-2 hidden font-sans text-[10px] font-semibold uppercase tracking-[0.32em] text-ink-muted sm:block">
-            Analyze · Sources · Insights · Navigate
+          <p className="mt-1 font-serif text-[16px]">
+            Truth has more than one source.
           </p>
-          <p className="mt-1 font-sans text-[11px] italic text-ink-soft md:hidden">{editionDate()}</p>
+          <p className="font-serif text-sm italic text-ink-soft">
+            More context. A clearer picture.
+          </p>
         </div>
-        <div className="flex items-center justify-end gap-1 text-ink-soft md:gap-2">
-          <HeaderButton href="/search" icon="search" label="Search" />
-          <HeaderButton href="/settings#language" icon="globe" label="Language" className="hidden md:inline-flex" />
-          <HeaderButton href="/settings#notifications" icon="bell" label="Notifications" className="hidden md:inline-flex" />
-          <HeaderButton href="/settings" icon="user" label="Profile" className="hidden md:inline-flex" />
+        <div className="flex min-w-0 items-center justify-center gap-3 lg:justify-end">
+          <form
+            action="/search"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-[2px] border border-rule px-2 py-1.5"
+          >
+            <Icon name="search" size={15} />
+            <input
+              name="q"
+              aria-label="Search stories, topics, or regions"
+              placeholder="Search stories, topics, or regions…"
+              className="min-w-0 w-full bg-transparent text-[10px] outline-none"
+            />
+          </form>
+          <details className="relative text-xs">
+            <summary className="cursor-pointer">EN</summary>
+            <div className="absolute right-0 z-20 w-36 border border-rule bg-paper p-3">
+              <Link href="/settings#language">Language preferences →</Link>
+            </div>
+          </details>
+          <Link href="/settings#notifications" aria-label="Notifications">
+            <Icon name="bell" />
+          </Link>
+          <Link href="/settings" aria-label="Profile">
+            <Icon name="user" />
+          </Link>
         </div>
       </div>
     </div>
-  );
-}
-
-function HeaderButton({ href, icon, label, className = "" }: { href: string; icon: "search" | "globe" | "bell" | "user"; label: string; className?: string }) {
-  return (
-    <Link href={href} className={`${className || "inline-flex"} size-9 items-center justify-center hover:text-ink`} aria-label={label} title={label}>
-      <Icon name={icon} size={19} />
-    </Link>
   );
 }
