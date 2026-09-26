@@ -1,26 +1,94 @@
 @import "tailwindcss";
 
+/* ALUNSINA NEWS design tokens (§10). Editorial, restrained; no political coding. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f4f1e8;
+  --paper-deep: #ebe6d8;
+  --ink: #1e211e;
+  --ink-soft: #4a4d47;
+  --ink-muted: #6f7268;
+  --forest: #123f35;
+  --forest-dark: #092d27;
+  --terracotta: #b4513d;
+  --ochre: #c49a45;
+  --rule: #c9c5b9;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-forest: var(--forest);
+  --color-forest-dark: var(--forest-dark);
+  --color-terracotta: var(--terracotta);
+  --color-ochre: var(--ochre);
+  --color-rule: var(--rule);
+  --font-serif: var(--font-newsreader), "Source Serif 4", Georgia, serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --radius-card: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--paper);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--ochre) 35%, transparent);
+}
+
+@layer components {
+  /* Small-caps section kicker: "DAILY BRIEFING", "DEVELOPING" */
+  .kicker {
+    @apply font-sans text-[11px] font-semibold uppercase tracking-[0.14em];
+  }
+  /* Newspaper section head with thick-over-thin rule */
+  .section-head {
+    @apply border-t-[3px] border-ink pt-1;
+  }
+  .section-head::after {
+    content: "";
+    display: block;
+    margin-top: 2px;
+    border-top: 1px solid var(--ink);
+  }
+  .headline {
+    @apply font-serif text-ink tracking-[-0.01em];
+  }
+  .link-quiet {
+    @apply underline decoration-rule underline-offset-4 hover:decoration-ink;
+  }
+  .meta {
+    @apply font-sans text-xs text-ink-muted tabular-nums;
+  }
+}
+
+/* Hide scrollbars on horizontally-scrolling rails (ticker, swipe compare) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--forest);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }
