@@ -2,14 +2,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CoverageBar, SaveButton, StatusKicker } from "@/components/ui";
-import { getStory } from "@/lib/queries";
+import { PhilippineCoverage } from "@/components/coverage/PhilippineCoverage";
+import { getRegionCoverage, getStory } from "@/lib/queries";
 import { plural, timeAgo } from "@/lib/format";
 import { CompareProvider, CompareSlot, CompareToggle } from "@/components/story/CompareMode";
 import { CompareView } from "@/components/story/CompareView";
 import { ShareButton } from "@/components/story/ShareButton";
 import { SourceEmphasis } from "@/components/story/SourceEmphasis";
 import { SourceList } from "@/components/story/SourceList";
-import { StoryCoverageBreakdown } from "@/components/story/StoryCoverageBreakdown";
 import { MobileCollapse } from "@/components/story/MobileCollapse";
 import {
   Angles,
@@ -31,17 +31,17 @@ export async function generateMetadata({ params }: PageProps<"/story/[id]">): Pr
   return { title: story.title, description: story.summary };
 }
 
-export default async function StoryPage({ params, searchParams }: PageProps<"/story/[id]">) {
+export default async function StoryPage({ params }: PageProps<"/story/[id]">) {
   const { id } = await params;
-  const { compare } = await searchParams;
   const story = getStory(id);
   if (!story) notFound();
 
   const firstReported = earliest(story.articles) ?? story.createdAt;
+  const platformCoverage = getRegionCoverage({ sinceHours: 48 });
   const path = `/story/${story.id}`;
 
   return (
-    <CompareProvider initial={compare === "1"}>
+    <CompareProvider key={story.id}>
       <article className="mx-auto max-w-[1280px] px-4 pb-12 pt-6 md:px-6 md:pt-10">
         {/* 1. Story header */}
         <header className="border-b border-ink pb-6">
@@ -52,6 +52,7 @@ export default async function StoryPage({ params, searchParams }: PageProps<"/st
           <h1 className="headline mt-3 max-w-[22ch] text-[34px] font-semibold leading-[1.08] sm:text-5xl md:max-w-[26ch] md:text-[56px] lg:text-[64px]">
             {story.title}
           </h1>
+          <p className="mt-3 max-w-3xl font-serif text-lg leading-relaxed text-ink-soft md:hidden">{story.summary}</p>
           <p className="meta mt-4 flex flex-wrap gap-x-2 gap-y-1">
             <span>{plural(story.stats.sources, "source")}</span>
             <span aria-hidden>·</span>
@@ -84,7 +85,7 @@ export default async function StoryPage({ params, searchParams }: PageProps<"/st
           {/* Main column. DOM order follows §20; `order-*` gives the §24 mobile priority:
               headline, summary, coverage, perspectives, evidence, blindspots, then timeline + sources. */}
           <div className="flex min-w-0 flex-col gap-12">
-            <div className="order-1">
+            <div className="order-1 hidden md:block">
               <WhatHappened story={story} since={firstReported} />
             </div>
 
@@ -95,17 +96,10 @@ export default async function StoryPage({ params, searchParams }: PageProps<"/st
             </Section>
 
             <Section id="coverage" title="Coverage" sub="Where, in what language, and by whom this story is reported" className="order-2 md:order-3">
-              {/* INTEGRATION SLOT: Home agent's <PhilippineCoverage coverage={story.coverage} /> map
-                  drops in here, above the island → region breakdown. Do not build a separate map. */}
-              <div className="grid gap-8 md:grid-cols-2">
-                <div>
-                  <h3 className="kicker mb-2 text-ink-muted">By island group &amp; region</h3>
-                  <StoryCoverageBreakdown coverage={story.coverage} />
-                </div>
-                <div>
-                  <h3 className="kicker mb-2 text-ink-muted">By language</h3>
-                  <LanguageBars languages={story.languages} />
-                </div>
+              <PhilippineCoverage coverage={story.coverage} compareTo={platformCoverage} />
+              <div className="mt-8">
+                <h3 className="kicker mb-2 text-ink-muted">By language</h3>
+                <LanguageBars languages={story.languages} />
               </div>
               <div className="mt-8">
                 <h3 className="kicker mb-2 text-ink-muted">Publishers by source type</h3>
@@ -132,7 +126,9 @@ export default async function StoryPage({ params, searchParams }: PageProps<"/st
               action={plural(story.stats.articles, "article")}
               className="order-8 md:order-7"
             >
-              <SourceList articles={story.articles} />
+              <MobileCollapse label={`all ${story.stats.articles} articles`}>
+                <SourceList articles={story.articles} />
+              </MobileCollapse>
             </Section>
 
             <Section id="blindspots" title="Potential blindspots" className="order-6 md:order-8">

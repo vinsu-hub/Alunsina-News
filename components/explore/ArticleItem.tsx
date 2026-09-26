@@ -17,8 +17,8 @@ export function ArticleItem({ a, showSource = true }: { a: Article; showSource?:
         </p>
       )}
       <h3 className="headline mt-1 text-[17px] leading-snug">{a.headline}</h3>
-      {a.excerpt && (
-        <p className="mt-1 line-clamp-2 font-serif text-[15px] leading-relaxed text-ink-soft">{a.excerpt}</p>
+      {a.excerpt && a.source.dataStatus !== "link" && (
+        <p className="mt-1 line-clamp-2 font-serif text-[15px] leading-relaxed text-ink-soft">{a.excerpt.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g)?.slice(0, 2).join(" ").trim() ?? a.excerpt}</p>
       )}
       <p className="meta mt-1.5">
         <time dateTime={a.publishedAt}>{timeAgo(a.publishedAt)}</time> · {language(a.language).label}

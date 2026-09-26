@@ -19,7 +19,7 @@ export function LeadStory({ story }: { story: StoryDetail }) {
         <StatusKicker status={story.status} />
         <span className="kicker text-forest">{story.topic}</span>
       </div>
-      <h2 id="lead-title" className="headline mt-2 text-[34px] leading-[1.08] font-semibold md:text-[44px] lg:text-[46px]">
+      <h2 id="lead-title" className="headline mt-2 text-[36px] leading-[1.06] font-semibold md:text-[44px] lg:text-[48px]">
         <Link href={href} className="hover:underline decoration-2 underline-offset-[6px]">
           {story.title}
         </Link>
@@ -35,7 +35,7 @@ export function LeadStory({ story }: { story: StoryDetail }) {
         ))}
         <div className="flex flex-col-reverse justify-end gap-1 px-2 py-2.5">
           <dt className="meta">Updated</dt>
-          <dd className="font-serif text-2xl leading-none text-ink">
+          <dd className="font-serif text-xl leading-none text-ink md:text-2xl">
             <time dateTime={story.updatedAt}>{timeAgo(story.updatedAt)}</time>
           </dd>
         </div>

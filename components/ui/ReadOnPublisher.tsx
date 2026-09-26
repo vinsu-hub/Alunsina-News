@@ -19,7 +19,7 @@ export function ReadOnPublisher({ url, source, className = "" }: { url: string; 
 
 export function SubscriptionTag() {
   return (
-    <span className="border border-ochre px-1 py-px font-sans text-[10px] font-medium uppercase tracking-wide text-[#8a6a25]">
+    <span className="border border-ochre px-1 py-px font-sans text-[10px] font-medium uppercase tracking-wide text-[#75571c]">
       Subscription required
     </span>
   );

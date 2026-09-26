@@ -8,11 +8,13 @@ import { StoryList } from "@/components/explore/StoryList";
 import { ArticleItem } from "@/components/explore/ArticleItem";
 import { IndexEntry } from "@/components/explore/IndexEntry";
 import { RegionComparisonBlock } from "@/components/explore/RegionComparisonBlock";
+import { PhilippineCoverage } from "@/components/coverage/PhilippineCoverage";
 import { listSources, listStories } from "@/lib/queries";
 import {
   getPlace,
   localReporting,
   placeStoryCounts,
+  placeCoverage,
   regionComparison,
   sourcesInRegions,
 } from "@/lib/queries/explore";
@@ -44,6 +46,7 @@ export default async function RegionPage({ params }: PageProps<"/regions/[id]">)
   const local = national ? [] : localReporting(place.regionIds);
   const comparison = national ? null : regionComparison(place.regionIds);
   const counts = placeStoryCounts();
+  const coverage = placeCoverage(place);
   const island = place.island ? ISLAND_GROUPS.find((g) => g.id === place.island)! : null;
   const subRegions = place.kind === "island" ? REGIONS.filter((r) => r.island === place.id) : [];
 
@@ -81,8 +84,14 @@ export default async function RegionPage({ params }: PageProps<"/regions/[id]">)
 
       <div className={`${CONTAINER} grid gap-x-10 gap-y-12 pt-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]`}>
         <div className="min-w-0 space-y-12">
-          {/* INTEGRATION SLOT: shared <PhilippineCoverage /> map goes here, focused on this place
-              (initialIsland = place.island, highlighted regions = place.regionIds). */}
+          <PhilippineCoverage
+            id="coverage"
+            {...coverage}
+            initialIsland={place.island}
+            primaryLabel="These stories"
+            compareLabel="National baseline"
+            sub={`Region-tagged articles across stories touching ${place.label}. National baseline: all region-tagged articles in this edition, including articles outside these stories.`}
+          />
 
           <section aria-labelledby="stories">
             <SectionHead id="stories" title={national ? "National stories" : `Stories touching ${place.label}`} />

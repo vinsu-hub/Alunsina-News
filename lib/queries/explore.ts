@@ -14,7 +14,7 @@ import {
   type RegionId,
   type SourceTypeId,
 } from "@/lib/taxonomy";
-import { getSource, listSources } from "@/lib/queries";
+import { coverageFromRegionCounts, getSource, listSources } from "@/lib/queries";
 import type { Article, Evidence } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -77,6 +77,26 @@ export function topicIndex(): { topic: string; slug: string; stories: number }[]
 
 export function topicFromSlug(slug: string): string | null {
   return topicIndex().find((t) => t.slug === slug)?.topic ?? null;
+}
+
+/** Specific subjects, ranked by article volume; category indexes remain separate. */
+export function trendingSubjects() {
+  const subjects = [
+    ["Flood Control", "flood control"],
+    ["Rice Prices", "rice prices"],
+    ["West Philippine Sea", "West Philippine Sea"],
+    ["Dengue", "dengue"],
+    ["Coral Bleaching", "coral bleaching"],
+    ["Inflation", "inflation"],
+    ["EDSA Traffic", "EDSA"],
+    ["Class Schedules", "class schedule"],
+  ];
+  return subjects.map(([label, query]) => {
+    const row = all(`SELECT COUNT(DISTINCT st.id) stories, COUNT(a.id) articles
+      FROM stories st JOIN articles a ON a.story_id = st.id
+      WHERE lower(st.title) LIKE ?`, `%${query.toLowerCase()}%`)[0];
+    return { label, query, stories: Number(row.stories), articles: Number(row.articles) };
+  }).filter((s) => s.stories > 0).sort((a, b) => b.articles - a.articles || a.label.localeCompare(b.label));
 }
 
 /** Distinct stories touching each region (via region-tagged articles), plus island + national totals. */
@@ -151,6 +171,21 @@ export function topicFacets(topic: string) {
 }
 
 /* ---------- region comparison ---------- */
+
+/** Same edition and denominator for the scoped story cohort and national baseline. */
+export function placeCoverage(place: Place) {
+  const condition = place.kind === "national"
+    ? "SELECT a.story_id FROM articles a JOIN sources s ON s.id = a.source_id WHERE s.type = 'national'"
+    : `SELECT story_id FROM articles WHERE region IN (${place.regionIds.map(() => "?").join(",")})`;
+  const scoped = all(
+    `SELECT region, COUNT(*) n FROM articles WHERE region IS NOT NULL
+     AND story_id IN (${condition}) GROUP BY region`,
+    ...(place.kind === "national" ? [] : place.regionIds),
+  );
+  const baseline = all(`SELECT region, COUNT(*) n FROM articles WHERE region IS NOT NULL GROUP BY region`);
+  const coverage = (rows: Row[]) => coverageFromRegionCounts(new Map(rows.map((r) => [r.region as string, r.n as number])));
+  return { coverage: coverage(scoped), compareTo: coverage(baseline) };
+}
 
 /**
  * Approximate resident population by region, from the PSA 2020 Census of Population and Housing.

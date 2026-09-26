@@ -33,7 +33,7 @@ export default async function BlindspotsPage({ searchParams }: PageProps<"/blind
       </div>
       <ExploreSubNav active="blindspots" />
       <div className={`${CONTAINER} grid gap-x-10 gap-y-8 pt-8 lg:grid-cols-[16rem_minmax(0,1fr)]`}>
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           <p className="font-serif text-[15px] leading-relaxed text-ink-soft">
             We call these <em>potential</em> blindspots because they are signals, not verdicts. Each is raised
             automatically when a story crosses a published threshold, and each shows the reason it was flagged. Coverage

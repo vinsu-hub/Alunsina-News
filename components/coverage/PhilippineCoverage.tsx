@@ -85,7 +85,7 @@ function shade(share: number, max: number) {
   if (share <= 0 || max <= 0) return { fill: "var(--paper-deep)", opacity: 1, dark: false };
   const t = Math.sqrt(share / max);
   const opacity = 0.14 + 0.86 * t;
-  return { fill: "var(--forest)", opacity, dark: opacity > 0.5 };
+  return { fill: "var(--forest)", opacity, dark: opacity > 0.6 };
 }
 
 /* ---------- component ---------- */
@@ -114,9 +114,6 @@ export function PhilippineCoverage({
 }) {
   const [mode, setMode] = useState<Mode>("primary");
   const [island, setIsland] = useState<IslandGroupId | null>(initialIsland);
-  // Bumped when the map (not the list) changes the island, so the list remounts
-  // with the new selection; list clicks don't remount, keeping keyboard focus.
-  const [listKey, setListKey] = useState(0);
 
   const shown = mode === "compare" && compareTo ? compareTo : coverage;
   const baseline = mode === "compare" ? null : (compareTo ?? null);
@@ -124,11 +121,9 @@ export function PhilippineCoverage({
 
   const selectFromMap = (next: IslandGroupId | null) => {
     setIsland(next);
-    setListKey((k) => k + 1);
   };
   const switchMode = (m: Mode) => {
     setMode(m);
-    setListKey((k) => k + 1);
   };
 
   const byRegion = new Map(shown.flatMap((c) => c.regions.map((r) => [r.regionId, r] as const)));
@@ -201,9 +196,9 @@ export function PhilippineCoverage({
                       y={y + TILE / 2 + (drill ? -2 : 4)}
                       textAnchor="middle"
                       className="font-sans"
-                      fontSize={rid === "barmm" ? 10 : 11}
+                      fontSize={rid === "barmm" ? 10 : 12}
                       fontWeight={600}
-                      fill={s.dark ? "var(--paper)" : "var(--ink-soft)"}
+                      fill={s.dark ? "var(--paper)" : "var(--ink)"}
                     >
                       {TILE_CODE[rid]}
                     </text>
@@ -214,7 +209,7 @@ export function PhilippineCoverage({
                         textAnchor="middle"
                         className="font-sans tabular-nums"
                         fontSize={10}
-                        fill={s.dark ? "var(--paper)" : "var(--ink-muted)"}
+                        fill={s.dark ? "var(--paper)" : "var(--ink)"}
                       >
                         {pct(regionCov?.share ?? 0)}
                       </text>
@@ -231,9 +226,15 @@ export function PhilippineCoverage({
                     ) : (
                       <g
                         role="button"
-                        tabIndex={-1}
+                        tabIndex={0}
                         className="cursor-pointer"
                         onClick={() => selectFromMap(isl)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            selectFromMap(isl);
+                          }
+                        }}
                         aria-label={`Show ${islandLabel(isl)} regions`}
                       >
                         <title>{`${r.label} · ${islandLabel(isl)}`}</title>

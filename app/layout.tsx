@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description: "One story. Multiple sources. Fuller context. Philippine news, compared across national, regional, and primary sources.",
 };
 
-export const viewport: Viewport = { themeColor: "#F4F1E8" };
+export const viewport: Viewport = { themeColor: "#F4F1E8", viewportFit: "cover" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   const trending = getTrendingTopics().map((t) => t.topic);
@@ -36,7 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <MainNav />
           <TrendingTicker topics={trending} />
         </header>
-        <main id="main">{children}</main>
+        <main id="main" className="min-w-0 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
         <Footer />
         <MobileTabBar />
       </body>

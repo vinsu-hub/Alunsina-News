@@ -8,19 +8,14 @@ import type { Article } from "@/lib/types";
 import { plural, timeAgo } from "@/lib/format";
 import { dateTime, groupByType } from "./util";
 
-const MOBILE_PREVIEW = 5;
-
 export function SourceList({ articles }: { articles: Article[] }) {
   const [type, setType] = useState<SourceTypeId | null>(null);
   const [lang, setLang] = useState<LanguageId | null>(null);
-  const [expanded, setExpanded] = useState(false);
 
   const types = SOURCE_TYPE_IDS.filter((t) => articles.some((a) => a.source.type === t));
   const langs = [...new Set(articles.map((a) => a.language))];
   const filtered = articles.filter((a) => (!type || a.source.type === type) && (!lang || a.language === lang));
   const groups = groupByType(filtered);
-  // Offset of each group's first article in the flat list (for the mobile preview cut-off).
-  const starts = groups.map((_, i) => groups.slice(0, i).reduce((n, g) => n + g.articles.length, 0));
 
   return (
     <div>
@@ -56,21 +51,19 @@ export function SourceList({ articles }: { articles: Article[] }) {
       {groups.length === 0 && <p className="meta">No articles match these filters.</p>}
 
       <div className="space-y-6">
-        {groups.map((g, gi) => {
-          const start = starts[gi];
-          const groupHidden = !expanded && start >= MOBILE_PREVIEW;
+        {groups.map((g) => {
           return (
-            <section key={g.type} className={groupHidden ? "hidden md:block" : ""} aria-label={sourceType(g.type).label}>
+            <section key={g.type} aria-label={sourceType(g.type).label}>
               <h3 className="flex items-baseline justify-between border-b border-ink pb-1">
                 <SourceTypeBadge type={g.type} className="text-ink" />
                 <span className="meta">{plural(g.articles.length, "article")}</span>
               </h3>
               <ul className="divide-y divide-rule">
-                {g.articles.map((a, i) => (
+                {g.articles.map((a) => (
                   <li
                     key={a.id}
                     id={`article-${a.id}`}
-                    className={`scroll-mt-4 py-4 ${!expanded && start + i >= MOBILE_PREVIEW ? "hidden md:block" : ""}`}
+                    className="scroll-mt-4 py-4"
                   >
                     <ArticleItem article={a} />
                   </li>
@@ -80,17 +73,6 @@ export function SourceList({ articles }: { articles: Article[] }) {
           );
         })}
       </div>
-
-      {filtered.length > MOBILE_PREVIEW && (
-        <button
-          type="button"
-          onClick={() => setExpanded((e) => !e)}
-          aria-expanded={expanded}
-          className="mt-4 w-full border border-ink py-2 font-sans text-xs font-semibold uppercase tracking-wide text-ink md:hidden"
-        >
-          {expanded ? "Show fewer articles" : `Show all ${filtered.length} articles`}
-        </button>
-      )}
     </div>
   );
 }

@@ -131,7 +131,7 @@ function DesktopCompare({
           const list = ofType(p.type);
           const article = list.find((a) => a.id === p.articleId) ?? list[0];
           return (
-            <div key={p.key} className={`min-w-0 ${i > 0 ? "pl-6" : ""} ${i < visible.length - 1 ? "pr-6" : ""}`}>
+            <div key={p.key} className={`min-w-0 [overflow-wrap:anywhere] ${i > 0 ? "pl-6" : ""} ${i < visible.length - 1 ? "pr-6" : ""}`}>
               <PanePickers
                 index={i}
                 types={types}
@@ -175,7 +175,7 @@ function PanePickers({
   const select =
     "w-full min-w-0 rounded-none border border-rule bg-paper px-2 py-1.5 font-sans text-xs text-ink hover:border-ink";
   return (
-    <div className="mb-4 flex items-end gap-2 border-b border-rule pb-3">
+    <div className="mb-4 grid grid-cols-1 items-end gap-2 border-b border-rule pb-3">
       {onType && type && (
         <label className="min-w-0 flex-1" htmlFor={`${id}-type`}>
           <span className="meta mb-1 block">Pane {index + 1} · Source type</span>
@@ -251,12 +251,10 @@ function PaneBody({ article: a, points }: { article: Article; points: string[] }
         {a.region && <> · {region(a.region).label}</>}
       </p>
       <ReadOnPublisher url={a.url} source={a.source} className="mt-3" />
-      {points.length > 0 && (
-        <p className="mt-4 border-t border-rule pt-2 font-sans text-[11px] leading-relaxed text-ink-muted">
-          <span className="font-semibold uppercase tracking-wide">What {sourceType(a.source.type).short} sources emphasize:</span>{" "}
-          {points.join(" · ")}
-        </p>
-      )}
+      <p className="mt-4 border-t border-rule pt-2 font-sans text-[11px] leading-relaxed text-ink-muted">
+          <span className="font-semibold uppercase tracking-wide">What this type emphasizes:</span>{" "}
+          {points.length ? points.join(" · ") : "Emphasis has not been summarized for this source type yet."}
+      </p>
     </article>
   );
 }
@@ -272,6 +270,7 @@ function MobileCompare({
   ofType: (t: SourceTypeId) => Article[];
   points: (t: SourceTypeId) => string[];
 }) {
+  const [selectedTypes, setSelectedTypes] = useState<Partial<Record<number, SourceTypeId>>>({});
   const [picked, setPicked] = useState<Partial<Record<SourceTypeId, string>>>({});
   const [index, setIndex] = useState(0);
   const rail = useRef<HTMLDivElement>(null);
@@ -294,25 +293,36 @@ function MobileCompare({
       <div
         ref={rail}
         onScroll={onScroll}
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+            event.preventDefault();
+            go(index + (event.key === "ArrowRight" ? 1 : -1));
+          }
+        }}
         role="region"
         aria-roledescription="carousel"
         aria-label="Coverage by source type"
         className="no-scrollbar grid snap-x snap-mandatory auto-cols-[100%] grid-flow-col overflow-x-auto overscroll-x-contain"
       >
-        {types.map((t, i) => {
+        {types.map((defaultType, i) => {
+          const t = selectedTypes[i] ?? defaultType;
           const list = ofType(t);
           const article = list.find((a) => a.id === picked[t]) ?? list[0];
           return (
             <div
-              key={t}
+              key={defaultType}
               role="group"
               aria-roledescription="slide"
               aria-label={`${i + 1} of ${n}: ${sourceType(t).label}`}
-              className="snap-start px-px"
+              className="min-w-0 snap-start px-px [overflow-wrap:anywhere]"
             >
               <PanePickers
                 index={i}
                 types={types}
+                type={t}
+                onType={(next) => setSelectedTypes((current) => ({ ...current, [i]: next }))}
                 articles={list}
                 articleId={article.id}
                 onArticle={(id) => setPicked((p) => ({ ...p, [t]: id }))}
@@ -334,7 +344,7 @@ function MobileCompare({
         </button>
         <div className="flex flex-col items-center gap-1.5">
           <span className="meta" aria-live="polite">
-            {index + 1} of {n} · {sourceType(types[index] ?? types[0]).short}
+            {index + 1} of {n} · {sourceType(selectedTypes[index] ?? types[index] ?? types[0]).short}
           </span>
           <span className="flex gap-1.5">
             {types.map((t, i) => (

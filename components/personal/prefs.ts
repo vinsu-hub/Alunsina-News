@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PREF_KEYS, usePref } from "@/lib/prefs";
 import type { LanguageId, RegionId, SourceTypeId } from "@/lib/taxonomy";
+import { LANGUAGES, REGIONS, SOURCE_TYPES, TOPICS } from "@/lib/taxonomy";
 
 export interface AreaPlace {
   key: string;
@@ -27,14 +28,18 @@ function asAreas(v: unknown): AreaPlace[] {
   if (!Array.isArray(v)) return NO_AREAS;
   return v.filter(
     (p): p is AreaPlace =>
-      !!p && typeof p === "object" && typeof p.name === "string" && typeof p.region === "string" && typeof p.province === "string",
+      !!p && typeof p === "object" && typeof p.key === "string" && typeof p.name === "string" && REGIONS.some((r) => r.id === p.region) && typeof p.province === "string",
   );
 }
 function asFollowing(v: unknown): Following {
   if (!v || typeof v !== "object") return EMPTY_FOLLOWING;
   const o = v as Partial<Record<keyof Following, unknown>>;
   const arr = <T,>(x: unknown) => (Array.isArray(x) ? (x.filter((s) => typeof s === "string") as T[]) : []);
-  return { topics: arr<string>(o.topics), regions: arr<RegionId>(o.regions), sources: arr<SourceTypeId>(o.sources) };
+  return {
+    topics: arr<string>(o.topics).filter((t) => TOPICS.some((topic) => topic === t)),
+    regions: arr<RegionId>(o.regions).filter((id) => REGIONS.some((r) => r.id === id)),
+    sources: arr<SourceTypeId>(o.sources).filter((id) => SOURCE_TYPES.some((s) => s.id === id)),
+  };
 }
 const asIds = (v: unknown) => (Array.isArray(v) ? (v.filter((s) => typeof s === "string") as string[]) : NO_IDS);
 
@@ -52,7 +57,7 @@ export function useSaved() {
 }
 export function useLanguages() {
   const [raw, set, ready] = usePref<unknown>(PREF_KEYS.languages, NO_LANGS);
-  return [asIds(raw) as LanguageId[], set as (v: LanguageId[]) => void, ready] as const;
+  return [asIds(raw).filter((id): id is LanguageId => LANGUAGES.some((l) => l.id === id)), set as (v: LanguageId[]) => void, ready] as const;
 }
 
 /**

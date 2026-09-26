@@ -32,9 +32,8 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
           name="q"
           type="search"
           defaultValue={q}
-          autoFocus
           placeholder="Try a topic, place, or agency"
-          className="min-w-0 flex-1 bg-transparent py-2 font-serif text-xl text-ink placeholder:text-ink-muted/70 focus:outline-none md:text-2xl"
+          className="min-w-0 flex-1 bg-transparent py-2 font-serif text-xl text-ink placeholder:text-ink-muted/70 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest md:text-2xl"
         />
         <button type="submit" className="flex shrink-0 items-center gap-1.5 px-2 font-sans text-sm font-semibold text-forest">
           <Icon name="search" />

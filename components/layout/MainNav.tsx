@@ -19,7 +19,7 @@ export function isActive(pathname: string, href: string) {
 export function MainNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Main" className="border-y border-ink">
+    <nav aria-label="Main" className="nav-edge border-y border-ink">
       <ul className="no-scrollbar mx-auto flex max-w-[1280px] justify-start gap-6 overflow-x-auto px-4 md:justify-center md:gap-9 md:px-6">
         {NAV.map((n) => {
           const active = isActive(pathname, n.href);

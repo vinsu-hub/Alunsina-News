@@ -190,8 +190,7 @@ export function EvidenceList({ evidence, factChecks }: { evidence: Evidence[]; f
     <div className="space-y-5">
       {groups.length === 0 ? (
         <p className="border-l-2 border-ochre pl-3 font-serif text-[15px] italic text-ink-soft">
-          No primary documents linked yet. Reports on this story have not pointed to an underlying document, dataset, or
-          official statement we could verify.
+          No primary documents linked yet. An underlying document, dataset, or official statement has not been added to this collection.
         </p>
       ) : (
         groups.map((g) => (

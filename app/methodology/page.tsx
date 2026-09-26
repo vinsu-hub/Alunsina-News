@@ -71,11 +71,11 @@ export default function MethodologyPage() {
       </header>
 
       <div className="mt-8 grid gap-x-12 gap-y-8 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <nav aria-label="On this page" className="lg:sticky lg:top-6 lg:self-start">
+        <nav aria-label="On this page" className="sticky top-0 z-20 min-w-0 self-start bg-paper py-2 lg:top-6">
           <p className="kicker border-b border-ink pb-1 text-ink">Contents</p>
-          <ol className="mt-1 columns-1 font-sans text-[13px] sm:columns-2 lg:columns-1">
+          <ol className="no-scrollbar mt-1 flex gap-4 overflow-x-auto font-sans text-[13px] lg:block">
             {TOC.map(([id, label], i) => (
-              <li key={id} className="break-inside-avoid border-b border-rule/60">
+              <li key={id} className="shrink-0 border-b border-rule/60 lg:shrink">
                 <a href={`#${id}`} className="flex gap-2 py-1.5 text-ink-soft hover:text-ink">
                   <span className="tabular-nums text-ink-muted">{String(i + 1).padStart(2, "0")}</span>
                   {label}
@@ -99,9 +99,10 @@ export default function MethodologyPage() {
                 never grouped into the same Story.
               </li>
               <li>
-                <strong>Similarity.</strong> Two articles are grouped when their wording overlaps by at least{" "}
-                {Math.round(CLUSTERING.similarity * 100)}% on our similarity measure (a standard text-comparison score
-                from 0 to 100%), after removing common words.
+                <strong>Similarity.</strong> Two articles can be grouped when their text-similarity score reaches{" "}
+                {CLUSTERING.similarity} on a scale from 0 to 1. We weight distinctive words in headlines and excerpts
+                using TF-IDF, then compare them with cosine similarity after removing common words. This score is
+                not a percentage of matching words or a measure of accuracy.
               </li>
               <li>
                 <strong>More than one source.</strong> A group needs at least {CLUSTERING.minSourcesForStory} different
@@ -161,15 +162,15 @@ export default function MethodologyPage() {
             </p>
             <p>These are the exact rules the system uses today. This list is generated from the same settings the detector runs on, so it always matches.</p>
             <ol className="space-y-4">
-              {BLINDSPOT_TYPES.map((b, i) => (
-                <li key={b.id} className="border-l-2 border-terracotta pl-4">
+              {Object.entries(BLINDSPOT_RULES).map(([id, rule], i) => (
+                <li key={id} className="border-l-2 border-terracotta pl-4">
                   <p className="kicker text-terracotta">
-                    {String(i + 1).padStart(2, "0")} · {b.label}
+                    {String(i + 1).padStart(2, "0")} · {BLINDSPOT_TYPES.find((b) => b.id === id)?.label ?? id}
                   </p>
-                  <p className="mt-1 font-sans text-[15px] text-ink-soft">{b.description}</p>
+                  <p className="mt-1 font-sans text-[15px] text-ink-soft">{BLINDSPOT_TYPES.find((b) => b.id === id)?.description}</p>
                   <p className="mt-1 font-sans text-[15px] text-ink">
                     <span className="font-semibold">Rule: </span>
-                    {BLINDSPOT_RULES[b.id].text}
+                    {rule.text}
                   </p>
                 </li>
               ))}
@@ -222,11 +223,12 @@ export default function MethodologyPage() {
                 </a>{" "}
                 with the page link, what you think is wrong, and any supporting document.
               </p>
+              <p className="mt-2 text-[13px] text-ink-soft">Sample edition: this contact address and the review targets below must be confirmed before the service launches.</p>
             </div>
             <p>
-              <strong>What happens next.</strong> We acknowledge every request within 2 working days. An editor
-              reviews it against the source&rsquo;s own disclosures and public records, and resolves most requests
-              within 7 days. If we change a source type, ownership entry, or Story grouping, the change is made on the
+              <strong>What happens next.</strong> Our target is to acknowledge requests within 2 working days. An editor
+              reviews the request against the source&rsquo;s own disclosures and public records, aiming to resolve it
+              within 7 working days; complex cases receive a progress update with the reason for delay. If we change a source type, ownership entry, or Story grouping, the change is made on the
               site and we reply to explain the decision. If we don&rsquo;t change it, we explain why.
             </p>
           </Section>

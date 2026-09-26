@@ -7,8 +7,8 @@ export function SampleBanner() {
   return (
     <div className="bg-ochre/25 text-center font-sans text-xs text-ink">
       <p className="mx-auto max-w-[1280px] px-4 py-1.5">
-        Sample edition: publishers and headlines below are fictional demo data. Run <code>npm run ingest</code> to load live feeds.{" "}
-        <Link href="/methodology" className="underline underline-offset-2">How ALUNSINA works</Link>
+        Sample edition: publishers and headlines are fictional demo data.{" "}
+        <Link href="/methodology" className="underline underline-offset-2">How ALUNSINA NEWS works</Link>
       </p>
     </div>
   );

@@ -1,21 +1,19 @@
 "use client";
 // Compare-coverage mode state (§20). The URL (`?compare=1`) is the durable source of
-// truth so links can deep-link into it; local state makes the toggle feel instant
-// while `router.replace` catches up.
-import { createContext, useContext, useState, type ReactNode } from "react";
+// truth for deep links and browser navigation.
+import { createContext, useContext, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui";
 
 const Ctx = createContext<{ on: boolean; toggle: () => void } | null>(null);
 
-export function CompareProvider({ initial, children }: { initial: boolean; children: ReactNode }) {
-  const [on, setOn] = useState(initial);
+export function CompareProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const on = params.get("compare") === "1";
   const toggle = () => {
     const next = !on;
-    setOn(next);
     const q = new URLSearchParams(params.toString());
     if (next) q.set("compare", "1");
     else q.delete("compare");

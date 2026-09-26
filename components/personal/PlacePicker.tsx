@@ -42,8 +42,8 @@ export function PlacePicker({
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
 
-  const { data, loading } = useJson<{ places: Found[] }>(debounced ? `/api/places?q=${encodeURIComponent(debounced)}` : null);
-  const results = debounced && q.trim() ? (data?.places ?? []) : [];
+  const { data, loading, error } = useJson<{ places: Found[] }>(debounced ? `/api/places?q=${encodeURIComponent(debounced)}` : null);
+  const results = debounced && q.trim() === debounced ? (data?.places ?? []) : [];
   const expanded = open && q.trim().length > 0;
   const listId = `${id}-list`;
   const optId = (i: number) => `${id}-opt-${i}`;
@@ -98,7 +98,7 @@ export function PlacePicker({
         const lat = pos.coords.latitude.toFixed(2);
         const lng = pos.coords.longitude.toFixed(2);
         fetch(`/api/places?lat=${lat}&lng=${lng}`)
-          .then((r) => r.json())
+          .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
           .then((d: { place: Found | null; reason?: string }) => {
             if (d.place) {
               setGeo({ state: "idle" });
@@ -123,7 +123,7 @@ export function PlacePicker({
         City or municipality
       </label>
       <div className="relative mt-2">
-        <div className="flex items-center gap-2 border border-ink bg-paper px-3">
+        <div className="flex items-center gap-2 border border-ink bg-paper px-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-forest">
           <Icon name="search" size={16} className="shrink-0 text-ink-muted" />
           <input
             ref={inputRef}
@@ -165,7 +165,7 @@ export function PlacePicker({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => choose(p)}
               onMouseEnter={() => setActive(i)}
-              className={`flex cursor-pointer items-baseline justify-between gap-3 border-b border-rule px-3 py-2 last:border-b-0 ${i === active ? "bg-paper-deep" : ""}`}
+              className={`flex cursor-pointer flex-col gap-0.5 border-b border-rule px-3 py-2 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3 ${i === active ? "bg-paper-deep" : ""}`}
             >
               <span className="font-serif text-[17px] text-ink">
                 {p.name}
@@ -176,7 +176,7 @@ export function PlacePicker({
           ))}
           {expanded && !results.length && (
             <li role="presentation" className="meta px-3 py-2">
-              {loading || q.trim() !== debounced ? "Searching…" : `No city or municipality matches “${q.trim()}”.`}
+              {loading || q.trim() !== debounced ? "Searching…" : error ? "We couldn't load matching places. Try searching again." : `No city or municipality matches “${q.trim()}”.`}
             </li>
           )}
         </ul>

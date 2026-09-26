@@ -6,9 +6,9 @@ import { ExploreSubNav } from "@/components/explore/ExploreSubNav";
 import { IndexEntry } from "@/components/explore/IndexEntry";
 import { PlaceIndex } from "@/components/explore/PlaceIndex";
 import { BlindspotEntry } from "@/components/explore/BlindspotEntry";
-import { getTrendingTopics, listBlindspots } from "@/lib/queries";
-import { languageCounts, placeStoryCounts, sourceTypeCounts, topicIndex } from "@/lib/queries/explore";
-import { SOURCE_TYPES, SOURCE_TYPE_COLORS, topicSlug } from "@/lib/taxonomy";
+import { listBlindspots } from "@/lib/queries";
+import { languageCounts, placeStoryCounts, sourceTypeCounts, topicIndex, trendingSubjects } from "@/lib/queries/explore";
+import { SOURCE_TYPES, SOURCE_TYPE_COLORS } from "@/lib/taxonomy";
 import { plural } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ export default function ExplorePage() {
   const places = placeStoryCounts();
   const typeCounts = sourceTypeCounts();
   const langs = languageCounts();
-  const trending = getTrendingTopics().slice(0, 8);
+  const trending = trendingSubjects();
   const blindspots = listBlindspots({ limit: 50 })
     .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt))
     .slice(0, 4);
@@ -54,18 +54,18 @@ export default function ExplorePage() {
 
           {/* Trending */}
           <section aria-labelledby="trending">
-            <SectionHead id="trending" title="Trending Topics" sub="Ranked by story volume over the last three days." />
+            <SectionHead id="trending" title="Trending Topics" sub="Tracked subjects, ranked by article volume in this edition." />
             <ol>
               {trending.map((t, i) => (
-                <li key={t.topic} className="border-t border-rule first:border-t-0">
-                  <Link href={`/topics/${topicSlug(t.topic)}`} className="group flex items-baseline gap-4 py-2">
+                <li key={t.query} className="border-t border-rule first:border-t-0">
+                  <Link href={`/search?q=${encodeURIComponent(t.query)}`} className="group flex items-baseline gap-4 py-2">
                     <span className="w-10 shrink-0 font-serif text-4xl font-semibold leading-none text-ochre tabular-nums">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="min-w-0 flex-1 headline text-xl leading-tight decoration-1 underline-offset-4 group-hover:underline">
-                      {t.topic}
+                      {t.label}
                     </span>
-                    <span className="meta shrink-0">{plural(t.stories, "story", "stories")}</span>
+                    <span className="meta shrink-0 text-right">{plural(t.articles, "article")}<br />{plural(t.stories, "story", "stories")}</span>
                   </Link>
                 </li>
               ))}

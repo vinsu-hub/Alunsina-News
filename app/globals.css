@@ -6,7 +6,7 @@
   --paper-deep: #ebe6d8;
   --ink: #1e211e;
   --ink-soft: #4a4d47;
-  --ink-muted: #6f7268;
+  --ink-muted: #66695f;
   --forest: #123f35;
   --forest-dark: #092d27;
   --terracotta: #b4513d;
@@ -90,5 +90,13 @@ body {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* A soft mask hints that the mobile edition navigation continues sideways. */
+@media (max-width: 767px) {
+  .nav-edge ul {
+    padding-right: 2rem;
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
   }
 }

@@ -22,7 +22,7 @@ export function DailyBriefing({ stories }: { stories: StorySummary[] }) {
         <ol className="divide-y divide-rule">
           {items.map((s, i) => (
             <li key={s.id} className="grid grid-cols-[2rem_1fr] gap-x-2 py-3 first:pt-1">
-              <span className="font-serif text-[34px] leading-none font-light text-terracotta tabular-nums" aria-hidden>
+              <span className="font-serif text-[34px] leading-none font-normal text-ink-muted tabular-nums" aria-hidden>
                 {i + 1}
               </span>
               <div className="min-w-0">

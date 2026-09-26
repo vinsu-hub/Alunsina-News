@@ -9,8 +9,9 @@ export function SaveButton({ storyId, className = "" }: { storyId: string; class
     <button
       type="button"
       aria-pressed={on}
+      aria-label={on ? "Remove story from saved stories" : "Save story"}
       onClick={() => setSaved(on ? saved.filter((id) => id !== storyId) : [storyId, ...saved])}
-      className={`inline-flex items-center gap-1.5 font-sans text-xs font-medium ${on ? "text-forest" : "text-ink-soft hover:text-ink"} ${className}`}
+      className={`inline-flex min-h-9 items-center gap-1.5 font-sans text-xs font-medium ${on ? "text-forest" : "text-ink-soft hover:text-ink"} ${className}`}
     >
       <Icon name="bookmark" size={16} className={on ? "fill-current" : ""} />
       {on ? "Saved" : "Save"}

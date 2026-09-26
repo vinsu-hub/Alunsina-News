@@ -18,7 +18,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink bg-paper pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="grid grid-cols-5">
         {TABS.map((t) => {
@@ -28,7 +28,7 @@ export function MobileTabBar() {
               <Link
                 href={t.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 py-2 font-sans text-[10px] font-medium ${active ? "text-forest-dark" : "text-ink-muted"}`}
+                className={`flex flex-col items-center min-h-14 gap-1 py-2 font-sans text-[10px] font-medium ${active ? "text-forest-dark font-semibold" : "text-ink-muted"}`}
               >
                 <Icon name={t.icon} size={20} />
                 {t.label}
