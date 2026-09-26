@@ -9,7 +9,9 @@ import { ArticleItem } from "@/components/explore/ArticleItem";
 import { IndexEntry } from "@/components/explore/IndexEntry";
 import { RegionComparisonBlock } from "@/components/explore/RegionComparisonBlock";
 import { PhilippineCoverage } from "@/components/coverage/PhilippineCoverage";
-import { listSources, listStories } from "@/lib/queries";
+import { CoverageChip } from "@/components/ui/CoverageChip";
+import { StoryImage } from "@/components/ui/StoryImage";
+import { getMagnifiedNews, listSources, listStories } from "@/lib/queries";
 import {
   getPlace,
   localReporting,
@@ -36,6 +38,7 @@ export default async function RegionPage({ params }: PageProps<"/regions/[id]">)
   const place = await getPlace(id);
   if (!place) notFound();
 
+  const magnified = place.kind === "island" && (id === "luzon" || id === "visayas" || id === "mindanao") ? await getMagnifiedNews(id, 5) : null;
   const national = place.kind === "national";
   const stories = national
     ? (await listStories({ sourceType: "national", limit: 24 }))
@@ -84,6 +87,11 @@ export default async function RegionPage({ params }: PageProps<"/regions/[id]">)
 
       <div className={`${CONTAINER} grid gap-x-10 gap-y-12 pt-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]`}>
         <div className="min-w-0 space-y-12">
+          {magnified && <section aria-labelledby="magnified"><SectionHead id="magnified" title="Editor's picks: Magnified News" sub={`Top 5 · ${place.label}`} />
+            <ol>{magnified.map((s, i) => <li key={s.id} className="grid grid-cols-[2rem_4rem_minmax(0,1fr)] gap-3 border-t border-rule py-4"><span className="font-serif text-3xl text-ochre">{i + 1}</span><StoryImage image={s.leadImage} alt={s.title} topic={s.topic} ratio="1/1" /><div className="min-w-0"><h3 className="headline text-xl"><Link href={`/story/${s.id}`} className="link-quiet">{s.title}</Link></h3><p className="meta my-1">{s.byline}</p><CoverageChip storyId={s.id} stats={s.coverageChip} variant="full" className="flex-wrap" /></div></li>)}</ol>
+            {!magnified.length && <p className="font-serif italic text-ink-muted">No qualifying stories in this edition yet.</p>}
+            <p className="meta mt-3">Placement is never purchased. Selection uses independent local reporting, distinct regions, and recency; two Luzon slots are reserved for non-NCR stories when available. <Link href="/methodology#magnified" className="link-quiet">Selection rules →</Link></p>
+          </section>}
           <PhilippineCoverage
             id="coverage"
             {...coverage}

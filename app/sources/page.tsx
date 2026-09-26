@@ -10,7 +10,7 @@ import { plural } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Sources",
-  description: "Every publisher and agency ALUNSINA NEWS reads, grouped by the eight source types.",
+  description: "Every publisher and agency ALUNSINA NEWS reads, grouped by the nine source types.",
 };
 
 export default async function SourcesPage({ searchParams }: PageProps<"/sources">) {

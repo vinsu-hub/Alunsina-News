@@ -6,7 +6,8 @@ import { ExploreSubNav } from "@/components/explore/ExploreSubNav";
 import { IndexEntry } from "@/components/explore/IndexEntry";
 import { PlaceIndex } from "@/components/explore/PlaceIndex";
 import { BlindspotEntry } from "@/components/explore/BlindspotEntry";
-import { listBlindspots } from "@/lib/queries";
+import { ContributorList } from "@/components/contributors/ContributorList";
+import { listContributors, listBlindspots } from "@/lib/queries";
 import { languageCounts, placeStoryCounts, sourceTypeCounts, topicIndex, trendingSubjects } from "@/lib/queries/explore";
 import { SOURCE_TYPES, SOURCE_TYPE_COLORS } from "@/lib/taxonomy";
 import { plural } from "@/lib/format";
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ExplorePage() {
+  const contributors = await listContributors({ kind: "expert" });
   const topics = await topicIndex();
   const places = await placeStoryCounts();
   const typeCounts = await sourceTypeCounts();
@@ -90,7 +92,7 @@ export default async function ExplorePage() {
             <SectionHead
               id="sources"
               title="Sources"
-              sub="Browse by all eight source types. Types describe what a source is, not what it believes."
+              sub="Browse by all nine source types. Types describe what a source is, not what it believes."
               action={<Link href="/methodology#source-types" className="link-quiet">How types are assigned</Link>}
             />
             <ul className="grid gap-x-8 sm:grid-cols-2">
@@ -129,6 +131,11 @@ export default async function ExplorePage() {
             <p className="meta mt-2">Counts are articles in each language.</p>
           </section>
         </div>
+
+        <section aria-labelledby="experts">
+          <SectionHead id="experts" title="Experts & Commentary" sub="Analysis — Not Reporting. Expert context, separate from Sources; commentary never counts as a source." action={<Link href="/experts" className="link-quiet">Browse by field →</Link>} />
+          <ContributorList contributors={contributors.slice(0, 4)} />
+        </section>
 
         {/* Blindspots (§24: mobile users reach blindspots here) */}
         <section aria-labelledby="blindspots">

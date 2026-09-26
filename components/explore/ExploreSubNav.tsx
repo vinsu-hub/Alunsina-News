@@ -5,6 +5,7 @@ const ITEMS = [
   { id: "regions", href: "/regions", label: "Regions" },
   { id: "sources", href: "/sources", label: "Sources" },
   { id: "languages", href: "/languages", label: "Languages" },
+  { id: "experts", href: "/experts", label: "Experts & Commentary" },
   { id: "blindspots", href: "/blindspots", label: "Blindspots" },
   { id: "saved", href: "/saved", label: "Saved" },
 ] as const;

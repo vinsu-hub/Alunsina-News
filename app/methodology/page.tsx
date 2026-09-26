@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { SourceTypeBadge } from "@/components/ui";
 import { CONTAINER } from "@/components/explore/PageHeader";
-import { BLINDSPOT_RULES, CLUSTERING } from "@/lib/thresholds";
+import { BLINDSPOT_RULES, CLUSTERING, RELATED_STORIES } from "@/lib/thresholds";
 import { BLINDSPOT_TYPES, DATA_STATUSES, SOURCE_TYPES } from "@/lib/taxonomy";
 
 export const metadata: Metadata = {
@@ -22,6 +22,9 @@ const TOC = [
   ["ownership", "Ownership & affiliation"],
   ["corrections", "Corrections"],
   ["linking", "We link out"],
+  ["related-stories", "Related Stories"],
+  ["contributors", "Contributors"],
+  ["magnified", "Magnified News"],
   ["principles", "Editorial principles"],
 ] as const;
 
@@ -121,7 +124,7 @@ export default function MethodologyPage() {
 
           <Section id="source-types" n={2} title="Source types">
             <p>
-              Every source is assigned one of eight types. Types describe <strong>what a source is</strong>, such as
+              Every source is assigned one of nine types. Types describe <strong>what a source is</strong>, such as
               an official record, a national newsroom, or a campus paper. They never describe what it believes. We do
               not use left, center, or right labels, and we do not score bias.
             </p>
@@ -204,6 +207,7 @@ export default function MethodologyPage() {
           </Section>
 
           <Section id="corrections" n={5} title="Corrections">
+            <p>Use the “This doesn’t belong here” flag on Coverage or Related Stories to report a mismatched article or story link. These are separate judgments, and either can be wrong.</p>
             <p>Tell us if you think we have:</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>assigned a source the wrong type, region, or language;</li>
@@ -251,7 +255,20 @@ export default function MethodologyPage() {
             </dl>
           </Section>
 
-          <Section id="principles" n={7} title="Editorial principles">
+          <Section id="related-stories" n={7} title="Related Stories">
+            <p>{RELATED_STORIES.text}</p><p>Coverage groups articles about the same event into one Story. Related Stories connect different events in a continuing issue. Both automated judgments can be wrong; use the “This doesn’t belong here” flag to request a correction.</p>
+          </Section>
+          <Section id="contributors" n={8} title="Contributors: verification and disclosure">
+            <p>Independent Journalists provide original reporting with a portfolio and byline history. Experts provide commentary in their field. Verification checks real identity, credentials, expertise or portfolio, and affiliation, never political alignment. Contributors are verified for identity and expertise, not viewpoint.</p>
+            <p>Declared conflicts of interest are shown prominently on contributor profiles, including party membership, paid consulting, board seats, and government appointments. Commentary is always labeled <strong>Analysis — Not Reporting</strong> and never counts as a reporting source.</p>
+            <p>Contributor commentary is original content hosted by ALUNSINA NEWS. Its editorial and liability responsibilities differ from linking to a publisher’s reporting; review and correction policies must cover that hosted content.</p>
+            <p>All current contributor profiles and commentary are fictional samples. Applications are not processed yet. Handling under RA 10173 (Data Privacy Act), consent, retention, access, and deletion arrangements are to be finalized before collection begins. <Link href="/contribute" className="link-quiet">Application preview →</Link></p>
+          </Section>
+          <Section id="magnified" n={9} title="Magnified News: earned regional discovery">
+            <p><strong>Placement is never purchased.</strong> Sponsored material, if introduced, must be labeled and structurally separate. Every entry has an attributed publisher or journalist byline.</p>
+            <p>Qualifying stories include independent, regional, community, or Independent Journalist reporting in the island within 72 hours. Ranking uses three times the number of distinct eligible sources, plus distinct regions, plus freshness (0–1 over 72 hours). Two of five Luzon slots are reserved for stories touching non-NCR regions when qualifying stories exist. Regional reader engagement is not collected yet; global traffic and payments are not ranking inputs.</p>
+          </Section>
+          <Section id="principles" n={10} title="Editorial principles">
             <ol className="grid gap-x-8 gap-y-2 font-sans text-[15px] sm:grid-cols-2">
               {PRINCIPLES.map((p, i) => (
                 <li key={p} className="flex gap-3 border-t border-rule pt-2">

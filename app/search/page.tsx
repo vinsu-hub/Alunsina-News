@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CoverageChip } from "@/components/ui/CoverageChip";
+import { StoryImage } from "@/components/ui/StoryImage";
 import { Icon, StatusKicker } from "@/components/ui";
 import { CONTAINER } from "@/components/explore/PageHeader";
 import { search } from "@/lib/queries";
@@ -67,7 +69,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
             <ol>
               {results.map((s) => (
                 <li key={s.id} className="border-t border-rule py-4 first:border-t-0">
-                  <p className="flex flex-wrap items-center gap-x-3">
+                  <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4"><StoryImage image={s.leadImage} alt={s.title} topic={s.topic} ratio="1/1" /><div className="min-w-0"><p className="flex flex-wrap items-center gap-x-3">
                     <span className="kicker text-ink-muted">Story</span>
                     <span className="kicker text-forest">{s.topic}</span>
                     <StatusKicker status={s.status} />
@@ -77,13 +79,10 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
                       {s.title}
                     </Link>
                   </h2>
-                  <p className="meta mt-1.5">
-                    {plural(s.stats.sources, "source")} · {plural(s.stats.regions, "region")} ·{" "}
-                    {plural(s.stats.languages, "language")}
-                  </p>
+                  <CoverageChip storyId={s.id} stats={s.stats} variant="full" className="mt-1.5 flex-wrap" />
                   <p className="meta mt-0.5">
                     Latest update: <time dateTime={s.updatedAt}>{timeAgo(s.updatedAt)}</time>
-                  </p>
+                  </p></div></div>
                 </li>
               ))}
             </ol>
