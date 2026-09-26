@@ -1,0 +1,268 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { SourceTypeBadge } from "@/components/ui";
+import { CONTAINER } from "@/components/explore/PageHeader";
+import { BLINDSPOT_RULES, CLUSTERING } from "@/lib/thresholds";
+import { BLINDSPOT_TYPES, DATA_STATUSES, SOURCE_TYPES } from "@/lib/taxonomy";
+
+export const metadata: Metadata = {
+  title: "Methodology & Trust",
+  description:
+    "How ALUNSINA NEWS groups articles into stories, assigns source types, flags potential blindspots, sources ownership data, and handles corrections.",
+};
+
+// Placeholder inbox until the editorial team confirms the address.
+const CORRECTIONS_EMAIL = "corrections@alunsina.news";
+
+const TOC = [
+  ["how-stories", "How articles become a Story"],
+  ["source-types", "Source types"],
+  ["blindspots", "Potential blindspots"],
+  ["ownership", "Ownership & affiliation"],
+  ["corrections", "Corrections"],
+  ["linking", "We link out"],
+  ["principles", "Editorial principles"],
+] as const;
+
+const PRINCIPLES = [
+  "Distinguish reporting from analysis, and primary sources from secondary ones.",
+  "Show provenance: where every piece of information came from.",
+  "Surface coverage gaps carefully, and always explain why.",
+  "Treat the Philippines as multilingual; English and Filipino are not the whole story.",
+  "Make regional journalism discoverable.",
+  "No bias scores. We describe sources by what they are, not what they believe.",
+  "Don't tell readers what to conclude.",
+  "Show the evidence.",
+  "Indicate uncertainty.",
+  "Timestamp developing information.",
+  "Disclose ownership factually.",
+  "Flag social-media claims as unverified until someone has reported on them.",
+  "Always link out to the original publisher.",
+];
+
+function Section({ id, n, title, children }: { id: string; n: number; title: string; children: ReactNode }) {
+  return (
+    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-16 border-t-[3px] border-ink pt-3">
+      <p className="kicker text-ochre">§ {String(n).padStart(2, "0")}</p>
+      <h2 id={`${id}-h`} className="headline mt-1 text-3xl font-semibold leading-tight md:text-4xl">
+        {title}
+      </h2>
+      <div className="prose-methodology mt-4 space-y-4 font-serif text-[17px] leading-relaxed text-ink-soft [&_strong]:text-ink">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export default function MethodologyPage() {
+  return (
+    <div className={`${CONTAINER} pt-8 md:pt-12`}>
+      <header className="border-b border-ink pb-6">
+        <p className="kicker text-forest">Methodology &amp; Trust</p>
+        <h1 className="headline mt-2 max-w-4xl text-4xl font-semibold leading-[1.05] md:text-6xl">
+          How we compare the news, and how to hold us to it.
+        </h1>
+        <p className="mt-4 max-w-3xl font-serif text-lg italic leading-snug text-ink-soft md:text-xl">
+          ALUNSINA NEWS groups reporting from many publishers into Stories so you can see who is covering what, from
+          where, and in which language. This page explains every rule we use, in plain language, and how to tell us
+          when we get something wrong.
+        </p>
+      </header>
+
+      <div className="mt-8 grid gap-x-12 gap-y-8 lg:grid-cols-[15rem_minmax(0,1fr)]">
+        <nav aria-label="On this page" className="lg:sticky lg:top-6 lg:self-start">
+          <p className="kicker border-b border-ink pb-1 text-ink">Contents</p>
+          <ol className="mt-1 columns-1 font-sans text-[13px] sm:columns-2 lg:columns-1">
+            {TOC.map(([id, label], i) => (
+              <li key={id} className="break-inside-avoid border-b border-rule/60">
+                <a href={`#${id}`} className="flex gap-2 py-1.5 text-ink-soft hover:text-ink">
+                  <span className="tabular-nums text-ink-muted">{String(i + 1).padStart(2, "0")}</span>
+                  {label}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
+        <article className="min-w-0 max-w-[72ch] space-y-14">
+          <Section id="how-stories" n={1} title="How articles become a Story">
+            <p>
+              A <strong>Story</strong> is one event or development, covered by more than one source. We collect
+              headlines and short excerpts from each publisher&rsquo;s public feed, then compare the words in each
+              headline and excerpt. Articles that talk about the same thing, using enough of the same key words, are
+              grouped together.
+            </p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>
+                <strong>Time window.</strong> Articles published more than {CLUSTERING.windowHours} hours apart are
+                never grouped into the same Story.
+              </li>
+              <li>
+                <strong>Similarity.</strong> Two articles are grouped when their wording overlaps by at least{" "}
+                {Math.round(CLUSTERING.similarity * 100)}% on our similarity measure (a standard text-comparison score
+                from 0 to 100%), after removing common words.
+              </li>
+              <li>
+                <strong>More than one source.</strong> A group needs at least {CLUSTERING.minSourcesForStory} different
+                publishers to become a Story. A single outlet&rsquo;s article stays an article.
+              </li>
+              <li>
+                <strong>Front page.</strong> Only Stories with at least {CLUSTERING.frontPageMinSources} sources can
+                appear in the daily edition.
+              </li>
+            </ul>
+            <p>
+              The grouping is automatic, and it can be wrong: two separate events can be merged, or one event split in
+              two. If you spot one, please <a href="#corrections" className="link-quiet text-ink">tell us</a>.
+            </p>
+          </Section>
+
+          <Section id="source-types" n={2} title="Source types">
+            <p>
+              Every source is assigned one of eight types. Types describe <strong>what a source is</strong>, such as
+              an official record, a national newsroom, or a campus paper. They never describe what it believes. We do
+              not use left, center, or right labels, and we do not score bias.
+            </p>
+            <dl className="divide-y divide-rule border-y border-rule font-sans text-[15px]">
+              {SOURCE_TYPES.map((t) => (
+                <div key={t.id} className="grid gap-1 py-3 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-4">
+                  <dt>
+                    <SourceTypeBadge type={t.id} />
+                  </dt>
+                  <dd className="text-ink-soft">
+                    {t.description}{" "}
+                    <Link href={`/sources?type=${t.id}`} className="link-quiet whitespace-nowrap text-ink">
+                      See sources
+                    </Link>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p>
+              <strong>How types are assigned.</strong> A type is set when a source is added, based on who publishes
+              it, where its newsroom and audience are, and whether it has a formal government affiliation. An outlet
+              owned or run by government is State-Run Media even when its reporting is independent in practice; a
+              private outlet reporting on a government statement is not.
+            </p>
+            <p>
+              <strong>Human review.</strong> Every assignment is reviewed by the ALUNSINA NEWS editorial team before a
+              source goes live, and reviewed again whenever ownership changes or a reader questions it. Automated
+              tools never change a source&rsquo;s type on their own.
+            </p>
+          </Section>
+
+          <Section id="blindspots" n={3} title="Potential blindspots">
+            <p>
+              A <strong>potential blindspot</strong> is a signal that coverage of a Story may be thin in some way. We
+              always call them &ldquo;potential&rdquo;: reporting may exist that we don&rsquo;t yet read, and a gap is
+              a prompt to look closer, not a claim that anyone is hiding something. Every flag shows the specific
+              reason it was raised.
+            </p>
+            <p>These are the exact rules the system uses today. This list is generated from the same settings the detector runs on, so it always matches.</p>
+            <ol className="space-y-4">
+              {BLINDSPOT_TYPES.map((b, i) => (
+                <li key={b.id} className="border-l-2 border-terracotta pl-4">
+                  <p className="kicker text-terracotta">
+                    {String(i + 1).padStart(2, "0")} · {b.label}
+                  </p>
+                  <p className="mt-1 font-sans text-[15px] text-ink-soft">{b.description}</p>
+                  <p className="mt-1 font-sans text-[15px] text-ink">
+                    <span className="font-semibold">Rule: </span>
+                    {BLINDSPOT_RULES[b.id].text}
+                  </p>
+                </li>
+              ))}
+            </ol>
+            <p>
+              <strong>Social claims.</strong> We never say a social-media claim is true or false. We only say that
+              independent verification is thin. When a fact-checker such as VERA Files, Rappler Fact Check, or Tsek.ph
+              publishes on the claim, we link to their work and remove the flag.
+            </p>
+            <p>
+              <Link href="/blindspots" className="link-quiet text-ink">See current potential blindspots →</Link>
+            </p>
+          </Section>
+
+          <Section id="ownership" n={4} title="Ownership & affiliation">
+            <p>
+              Each Source Profile states who owns or runs the publication. We take this from the publisher&rsquo;s own
+              disclosures (About and corporate pages) and from public filings, such as Securities and Exchange
+              Commission and Philippine Stock Exchange disclosures, and government charters for state-run outlets. Each
+              profile names the document the information came from.
+            </p>
+            <p>
+              <strong>Facts only.</strong> We record who owns what. We do not characterize owners, speculate about
+              influence, or rate independence.
+            </p>
+            <p>
+              <strong>Keeping it current.</strong> The editorial team re-checks every ownership entry at least once
+              every six months, and immediately when a sale, merger, or change in affiliation is reported. Readers can
+              flag an outdated entry through the corrections process below.
+            </p>
+          </Section>
+
+          <Section id="corrections" n={5} title="Corrections">
+            <p>Tell us if you think we have:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>assigned a source the wrong type, region, or language;</li>
+              <li>stated ownership or affiliation incorrectly or out of date;</li>
+              <li>grouped unrelated articles into one Story, or split one event into several;</li>
+              <li>flagged a potential blindspot that doesn&rsquo;t hold up, or missed reporting that exists.</li>
+            </ul>
+            <div className="border border-ink bg-paper-deep p-4 font-sans text-[15px] text-ink">
+              <p className="kicker text-ink">Send a correction</p>
+              <p className="mt-2">
+                Email{" "}
+                <a
+                  href={`mailto:${CORRECTIONS_EMAIL}?subject=${encodeURIComponent("Correction request")}`}
+                  className="font-semibold text-forest underline underline-offset-4"
+                >
+                  {CORRECTIONS_EMAIL}
+                </a>{" "}
+                with the page link, what you think is wrong, and any supporting document.
+              </p>
+            </div>
+            <p>
+              <strong>What happens next.</strong> We acknowledge every request within 2 working days. An editor
+              reviews it against the source&rsquo;s own disclosures and public records, and resolves most requests
+              within 7 days. If we change a source type, ownership entry, or Story grouping, the change is made on the
+              site and we reply to explain the decision. If we don&rsquo;t change it, we explain why.
+            </p>
+          </Section>
+
+          <Section id="linking" n={6} title="We link out; we don't republish">
+            <p>
+              ALUNSINA NEWS is an index, not a copy. For each article we keep only the headline, publisher and byline,
+              publication time, a short excerpt of one or two sentences, the language, the region, and a link. Every
+              article carries a <strong>&ldquo;Read on [Publisher]&rdquo;</strong> link, and you finish reading on the
+              publisher&rsquo;s own site. Paywalled publications are marked &ldquo;Subscription required.&rdquo;
+            </p>
+            <p>Each Source Profile shows how we receive that publisher&rsquo;s material:</p>
+            <dl className="divide-y divide-rule border-y border-rule font-sans text-[15px]">
+              {DATA_STATUSES.map((d) => (
+                <div key={d.id} className="grid gap-1 py-3 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-4">
+                  <dt className="font-semibold text-ink">{d.label}</dt>
+                  <dd className="text-ink-soft">{d.description}</dd>
+                </div>
+              ))}
+            </dl>
+          </Section>
+
+          <Section id="principles" n={7} title="Editorial principles">
+            <ol className="grid gap-x-8 gap-y-2 font-sans text-[15px] sm:grid-cols-2">
+              {PRINCIPLES.map((p, i) => (
+                <li key={p} className="flex gap-3 border-t border-rule pt-2">
+                  <span className="font-serif text-lg font-semibold leading-none text-ochre tabular-nums">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="text-ink-soft">{p}</span>
+                </li>
+              ))}
+            </ol>
+          </Section>
+        </article>
+      </div>
+    </div>
+  );
+}
