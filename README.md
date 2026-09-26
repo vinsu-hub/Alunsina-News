@@ -34,3 +34,11 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Scheduled ingestion (Modal)
+
+`cron/ingest_cron.py` calls the deployed app's `POST /api/ingest` every 30 minutes.
+
+1. Deploy the Next.js app with `INGEST_TOKEN` set.
+2. `modal secret create alunsina-ingest INGEST_URL=https://<host>/api/ingest INGEST_TOKEN=<token>`
+3. `modal deploy cron/ingest_cron.py` (use `modal run cron/ingest_cron.py` for a one-off run)
