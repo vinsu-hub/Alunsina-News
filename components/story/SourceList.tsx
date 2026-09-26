@@ -1,8 +1,9 @@
 "use client";
 // Every article in the story, grouped by source type (§20, §22 ownership).
 import Link from "next/link";
+import { FlagButton } from "./FlagButton";
 import { useState } from "react";
-import { ReadOnPublisher, SourceTypeBadge } from "@/components/ui";
+import { ReadOnPublisher, StoryImage, SourceTypeBadge } from "@/components/ui";
 import { SOURCE_TYPE_IDS, dataStatus, language, region, sourceType, type LanguageId, type SourceTypeId } from "@/lib/taxonomy";
 import type { Article } from "@/lib/types";
 import { plural, timeAgo } from "@/lib/format";
@@ -101,6 +102,7 @@ function ArticleItem({ article: a }: { article: Article }) {
       {social && (
         <p className="mt-2 font-sans text-xs font-medium text-terracotta">Circulating online; not independently reported.</p>
       )}
+      {a.imageUrl && <StoryImage image={{ url: a.imageUrl, credit: a.imageCredit ?? a.source.name }} alt={a.headline} className="mt-3 max-w-[260px]" />}
       <h4 className="headline mt-2 text-lg leading-snug">{a.headline}</h4>
       {a.excerpt && <p className="mt-1 font-serif text-[15px] leading-relaxed text-ink-soft">{a.excerpt}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -110,6 +112,7 @@ function ArticleItem({ article: a }: { article: Article }) {
         </span>
         <ReadOnPublisher url={a.url} source={a.source} />
       </div>
+      <FlagButton kind="coverage_mismatch" storyId={a.storyId} targetId={a.id} />
     </article>
   );
 }

@@ -2,8 +2,9 @@
 // Compare coverage (§20): the same story as told by different source types.
 // Desktop: 2–3 side-by-side panes (4 at ≥1440px). Mobile: a swipeable sequence.
 import Link from "next/link";
+import { FlagButton } from "./FlagButton";
 import { useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Icon, ReadOnPublisher, SourceTypeBadge } from "@/components/ui";
+import { Icon, ReadOnPublisher, StoryImage, SourceTypeBadge } from "@/components/ui";
 import { SOURCE_TYPE_COLORS, language, region, sourceType, type SourceTypeId } from "@/lib/taxonomy";
 import type { Article, Emphasis } from "@/lib/types";
 import { timeAgo } from "@/lib/format";
@@ -244,6 +245,7 @@ function PaneBody({ article: a, points }: { article: Article; points: string[] }
           Circulating online; not independently reported.
         </p>
       )}
+      {a.imageUrl && <StoryImage image={{ url: a.imageUrl, credit: a.imageCredit ?? a.source.name }} alt={a.headline} className="mt-3 max-w-[260px]" />}
       <h3 className="headline mt-3 text-xl leading-snug md:text-[22px]">{a.headline}</h3>
       <p className="mt-2 font-serif text-[15px] leading-relaxed text-ink-soft">{a.excerpt}</p>
       <p className="meta mt-3">
@@ -255,6 +257,7 @@ function PaneBody({ article: a, points }: { article: Article; points: string[] }
           <span className="font-semibold uppercase tracking-wide">What this type emphasizes:</span>{" "}
           {points.length ? points.join(" · ") : "Emphasis has not been summarized for this source type yet."}
       </p>
+      <FlagButton kind="coverage_mismatch" storyId={a.storyId} targetId={a.id} />
     </article>
   );
 }

@@ -23,7 +23,7 @@ export const dateTime = (iso: string) =>
     hourCycle: "h23",
   }).format(new Date(iso));
 
-/** Articles grouped by source type in the canonical 8-type order; empty types omitted. */
+/** Articles grouped by source type in the canonical 9-type order; empty types omitted. */
 export function groupByType(articles: Article[]): { type: SourceTypeId; articles: Article[] }[] {
   return SOURCE_TYPE_IDS.map((type) => ({ type, articles: articles.filter((a) => a.source.type === type) })).filter(
     (g) => g.articles.length > 0,
@@ -39,6 +39,7 @@ export const COMPARE_ORDER: SourceTypeId[] = [
   "government",
   "regional",
   "independent",
+  "journalist",
   "national",
   "state",
   "community",

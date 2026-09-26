@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Rule, SourceTypeBadge, StoryCard } from "@/components/ui";
-import { plural } from "@/lib/format";
+import { CoverageChip, StoryImage, Rule, SourceTypeBadge, StoryCard } from "@/components/ui";
+import { plural, timeAgo } from "@/lib/format";
 import { region as regionOf } from "@/lib/taxonomy";
 import type { Source, StorySummary } from "@/lib/types";
 import { PlacePicker } from "./PlacePicker";
@@ -146,10 +146,11 @@ function AreaFeedSections({ place }: { place: AreaPlace }) {
         <span className="block font-normal normal-case tracking-normal text-ink-muted sm:ml-3 sm:inline">Last {data.windowHours} hours</span>
       </p>
 
+      <StoryImage image={data.local[0]?.leadImage} alt={data.local[0]?.title ?? ""} topic={data.local[0]?.topic ?? `Local coverage · ${shortName}`} className="mt-6 max-w-3xl" priority />
       <div className="mt-6 grid gap-x-8 gap-y-8 lg:grid-cols-12">
         <Section
           id="local"
-          title="Local stories"
+          title="Latest local stories"
           sub={`Reporting from ${regionLabel} that names ${shortName} or ${place.province}`}
           className="lg:col-span-8"
           empty={`No stories naming ${shortName} or ${place.province} ${span}.`}
@@ -259,12 +260,16 @@ function Section({
         <p className="border-t border-rule pt-3 font-serif text-[15px] italic text-ink-muted">{empty}</p>
       ) : (
         <ul className={columns ? "grid gap-x-8 sm:grid-cols-2" : ""}>
-          {stories.map((s, i) => (
+          {stories.map((s) => (
             <li
               key={s.id}
               className={`border-t border-rule py-3 first:border-t-0 first:pt-0 ${columns ? "sm:[&:nth-child(2)]:border-t-0 sm:[&:nth-child(2)]:pt-0" : ""}`}
             >
-              <StoryCard story={s} variant={lead && i === 0 ? "standard" : "compact"} />
+              {lead ? <>
+                <h3 className="headline text-xl leading-snug"><Link href={`/story/${s.id}`} className="link-quiet">{s.title}</Link></h3>
+                <p className="meta mt-1"><time dateTime={s.updatedAt} suppressHydrationWarning>{timeAgo(s.updatedAt)}</time> · {s.topic}</p>
+                <CoverageChip storyId={s.id} stats={s.stats} className="mt-2" />
+              </> : <StoryCard story={s} variant="compact" />}
             </li>
           ))}
         </ul>

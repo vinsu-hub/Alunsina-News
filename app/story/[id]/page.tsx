@@ -1,9 +1,9 @@
 // Story detail (§20): headline → context → sources → evidence.
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CoverageBar, SaveButton, StatusKicker } from "@/components/ui";
+import { CoverageBar, CoverageChip, StoryImage, SaveButton, StatusKicker } from "@/components/ui";
 import { PhilippineCoverage } from "@/components/coverage/PhilippineCoverage";
-import { getRegionCoverage, getStory } from "@/lib/queries";
+import { getRegionCoverage, getStory, getStoryCommentary, getRelatedStories } from "@/lib/queries";
 import { plural, timeAgo } from "@/lib/format";
 import { CompareProvider, CompareSlot, CompareToggle } from "@/components/story/CompareMode";
 import { CompareView } from "@/components/story/CompareView";
@@ -22,6 +22,7 @@ import {
   Timeline,
   WhatHappened,
 } from "@/components/story/Sections";
+import { ExpertCommentary, RelatedStories } from "@/components/story/StoryExtras";
 import { dateTime, earliest } from "@/components/story/util";
 
 export async function generateMetadata({ params }: PageProps<"/story/[id]">): Promise<Metadata> {
@@ -37,7 +38,7 @@ export default async function StoryPage({ params }: PageProps<"/story/[id]">) {
   if (!story) notFound();
 
   const firstReported = earliest(story.articles) ?? story.createdAt;
-  const platformCoverage = await getRegionCoverage({ sinceHours: 48 });
+  const [platformCoverage, commentary, related] = await Promise.all([getRegionCoverage({ sinceHours: 48 }), getStoryCommentary(story.id), getRelatedStories(story.id)]);
   const path = `/story/${story.id}`;
 
   return (
@@ -54,11 +55,7 @@ export default async function StoryPage({ params }: PageProps<"/story/[id]">) {
           </h1>
           <p className="mt-3 max-w-3xl font-serif text-lg leading-relaxed text-ink-soft md:hidden">{story.summary}</p>
           <p className="meta mt-4 flex flex-wrap gap-x-2 gap-y-1">
-            <span>{plural(story.stats.sources, "source")}</span>
-            <span aria-hidden>·</span>
-            <span>{plural(story.stats.regions, "region")}</span>
-            <span aria-hidden>·</span>
-            <span>{plural(story.stats.languages, "language")}</span>
+            <CoverageChip storyId={story.id} stats={story.stats} variant="full" />
             <span aria-hidden>·</span>
             <span>
               First reported <time dateTime={firstReported}>{dateTime(firstReported)}</time>
@@ -68,6 +65,7 @@ export default async function StoryPage({ params }: PageProps<"/story/[id]">) {
               Updated <time dateTime={story.updatedAt}>{timeAgo(story.updatedAt)}</time>
             </span>
           </p>
+          {story.leadImage && <StoryImage image={story.leadImage} alt={story.title} topic={story.topic} priority className="mt-5 max-w-3xl" />}
           <CoverageBar byType={story.stats.byType} className="mt-4 max-w-3xl" />
           <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
             <CompareToggle />
@@ -119,19 +117,26 @@ export default async function StoryPage({ params }: PageProps<"/story/[id]">) {
               <EvidenceList evidence={story.evidence} factChecks={story.factChecks} />
             </Section>
 
+            <Section id="commentary" title="Expert Commentary" sub="Signed analysis, separate from reporting and source counts" className="order-9 md:order-7">
+              <MobileCollapse label="expert commentary"><ExpertCommentary items={commentary} /></MobileCollapse>
+            </Section>
+            <Section id="related" title="Related Stories" sub="Different events in the same ongoing situation" className="order-10 md:order-8">
+              <MobileCollapse label="related stories"><RelatedStories items={related} storyId={story.id} /></MobileCollapse>
+            </Section>
+
             <Section
               id="sources"
               title="Source list"
               sub="Every article in this story, grouped by source type. Read the full reporting on each publisher's site."
               action={plural(story.stats.articles, "article")}
-              className="order-8 md:order-7"
+              className="order-8 md:order-9"
             >
               <MobileCollapse label={`all ${story.stats.articles} articles`}>
                 <SourceList articles={story.articles} />
               </MobileCollapse>
             </Section>
 
-            <Section id="blindspots" title="Potential blindspots" className="order-6 md:order-8">
+            <Section id="blindspots" title="Potential blindspots" className="order-6 md:order-10">
               <Blindspots blindspots={story.blindspots} />
             </Section>
           </div>
