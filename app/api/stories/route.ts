@@ -18,12 +18,12 @@ const list = (v: string | null) =>
  * GET /api/stories?ids=a,b,c                            → StorySummary[] in id order (unknown ids dropped)
  * GET /api/stories?topics=Health&regions=r4a&types=…    → stories matching any followed topic/region/source type
  */
-export function GET(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  if (sp.has("ids")) return Response.json({ stories: getStorySummaries(list(sp.get("ids"))) });
+  if (sp.has("ids")) return Response.json({ stories: await getStorySummaries(list(sp.get("ids"))) });
   const topics = list(sp.get("topics")).filter(isTopic);
   const regions = list(sp.get("regions")).filter(isRegionId);
   const sourceTypes = list(sp.get("types")).filter(isSourceTypeId);
   if (!topics.length && !regions.length && !sourceTypes.length) return Response.json({ stories: [] });
-  return Response.json({ stories: getFollowingFeed({ topics, regions, sourceTypes }) });
+  return Response.json({ stories: await getFollowingFeed({ topics, regions, sourceTypes }) });
 }

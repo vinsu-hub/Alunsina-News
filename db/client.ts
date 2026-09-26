@@ -1,142 +1,123 @@
-// SQLite via Node's built-in `node:sqlite` (no native build step).
-// JSON-array columns are stored as TEXT and parsed in lib/queries.ts.
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
+import { PGlite, type Transaction } from "@electric-sql/pglite";
+import postgres from "postgres";
 import path from "node:path";
+import { mkdir } from "node:fs/promises";
+import { applyMigrations } from "./migrate";
 
-export const DB_PATH =
-  process.env.ALUNSINA_DB ?? path.join(process.cwd(), "data", "alunsina.db");
-
-const SCHEMA = /* sql */ `
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-
-CREATE TABLE IF NOT EXISTS sources (
-  id               TEXT PRIMARY KEY,           -- slug
-  name             TEXT NOT NULL,
-  type             TEXT NOT NULL,              -- SourceTypeId
-  ownership        TEXT NOT NULL,              -- factual, no editorializing (§22)
-  ownership_source TEXT,                       -- where the ownership fact came from
-  data_status      TEXT NOT NULL,              -- DataStatusId
-  paywalled        INTEGER NOT NULL DEFAULT 0,
-  homepage         TEXT NOT NULL,
-  feed_url         TEXT,
-  regions          TEXT NOT NULL DEFAULT '[]', -- RegionId[]
-  languages        TEXT NOT NULL DEFAULT '[]', -- LanguageId[]
-  topics           TEXT NOT NULL DEFAULT '[]',
-  active           INTEGER NOT NULL DEFAULT 1
-);
-
-CREATE TABLE IF NOT EXISTS stories (
-  id          TEXT PRIMARY KEY,                -- slug
-  title       TEXT NOT NULL,
-  summary     TEXT NOT NULL DEFAULT '',
-  status      TEXT NOT NULL DEFAULT 'developing',
-  topic       TEXT NOT NULL,
-  score       REAL NOT NULL DEFAULT 0,         -- ranking for the edition
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS articles (
-  id           TEXT PRIMARY KEY,               -- hash of canonical url
-  source_id    TEXT NOT NULL REFERENCES sources(id),
-  story_id     TEXT REFERENCES stories(id) ON DELETE SET NULL,
-  headline     TEXT NOT NULL,
-  byline       TEXT,
-  url          TEXT NOT NULL UNIQUE,
-  excerpt      TEXT NOT NULL DEFAULT '',        -- <= 2 sentences, enforced at ingest (§5A)
-  published_at TEXT NOT NULL,
-  language     TEXT NOT NULL DEFAULT 'en',
-  region       TEXT,                           -- RegionId the reporting is about/from
-  fetched_at   TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS articles_story ON articles(story_id);
-CREATE INDEX IF NOT EXISTS articles_source ON articles(source_id);
-CREATE INDEX IF NOT EXISTS articles_published ON articles(published_at);
-
-CREATE TABLE IF NOT EXISTS story_emphasis (
-  story_id    TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
-  source_type TEXT NOT NULL,
-  points      TEXT NOT NULL DEFAULT '[]',      -- string[]
-  PRIMARY KEY (story_id, source_type)
-);
-
-CREATE TABLE IF NOT EXISTS story_angles (
-  story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
-  angle    TEXT NOT NULL,
-  share    REAL NOT NULL,                      -- 0..1 of articles
-  note     TEXT,
-  PRIMARY KEY (story_id, angle)
-);
-
-CREATE TABLE IF NOT EXISTS blindspots (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  story_id    TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
-  type        TEXT NOT NULL,                   -- BlindspotTypeId
-  reason      TEXT NOT NULL,                   -- why it was detected (always shown)
-  example     TEXT NOT NULL,                   -- one-line concrete example
-  link_label  TEXT,
-  link_href   TEXT,
-  detected_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS timeline_events (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  story_id    TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
-  at          TEXT NOT NULL,
-  label       TEXT NOT NULL,
-  source_type TEXT,
-  article_id  TEXT
-);
-
-CREATE TABLE IF NOT EXISTS evidence (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  story_id     TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
-  kind         TEXT NOT NULL,                  -- document | statement | dataset | study | report
-  title        TEXT NOT NULL,
-  publisher    TEXT NOT NULL,
-  url          TEXT NOT NULL,
-  published_at TEXT
-);
-
-CREATE TABLE IF NOT EXISTS fact_checks (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  story_id     TEXT REFERENCES stories(id) ON DELETE SET NULL,
-  claim        TEXT NOT NULL,
-  org          TEXT NOT NULL,
-  rating       TEXT,                           -- as published by the fact-checker, verbatim
-  url          TEXT NOT NULL UNIQUE,
-  published_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS ingest_runs (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  started_at    TEXT NOT NULL,
-  finished_at   TEXT,
-  articles_seen INTEGER NOT NULL DEFAULT 0,
-  articles_new  INTEGER NOT NULL DEFAULT 0,
-  stories       INTEGER NOT NULL DEFAULT 0,
-  errors        TEXT NOT NULL DEFAULT '[]'
-);
-`;
-
-const g = globalThis as unknown as { __alunsinaDb?: DatabaseSync };
-
-export function getDb(): DatabaseSync {
-  if (!g.__alunsinaDb) {
-    mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    const db = new DatabaseSync(DB_PATH);
-    db.exec(SCHEMA);
-    g.__alunsinaDb = db;
-  }
-  return g.__alunsinaDb;
+export type Params = readonly unknown[];
+export type Row = Record<string, unknown>;
+export interface Db {
+  query<T = Row>(sql: string, params?: Params): Promise<T[]>;
+  one<T = Row>(sql: string, params?: Params): Promise<T | undefined>;
+  execute(sql: string, params?: Params): Promise<{ changes: number }>;
+  exec(sql: string): Promise<void>;
+  tx<T>(fn: (db: Db) => Promise<T>): Promise<T>;
+  close(): Promise<void>;
 }
+export const DB_PATH = process.env.DATABASE_URL
+  ? "DATABASE_URL (Postgres)"
+  : path.resolve(process.env.ALUNSINA_PGLITE_DIR ?? "data/pglite");
 
-export const json = <T>(s: unknown, fallback: T): T => {
-  if (typeof s !== "string") return fallback;
+// Dates use the same ISO-string contract for both drivers and all public mappers.
+function normalize<T>(rows: unknown[]): T[] {
+  return rows.map((row) =>
+    Object.fromEntries(
+      Object.entries(row as Row).map(([key, value]) => [
+        key,
+        value instanceof Date ? value.toISOString() : value,
+      ]),
+    ),
+  ) as T[];
+}
+function embedded(
+  engine: PGlite | Transaction,
+  close: () => Promise<void>,
+): Db {
+  const db: Db = {
+    async query<T>(sql: string, params: Params = []) {
+      return normalize<T>((await engine.query(sql, [...params])).rows);
+    },
+    async one<T>(sql: string, params?: Params) {
+      return (await db.query<T>(sql, params))[0];
+    },
+    async execute(sql: string, params: Params = []) {
+      return {
+        changes: (await engine.query(sql, [...params])).affectedRows ?? 0,
+      };
+    },
+    async exec(sql: string) {
+      await engine.exec(sql);
+    },
+    async tx<T>(fn: (t: Db) => Promise<T>) {
+      if (!("transaction" in engine))
+        throw new Error("Nested transactions are not supported");
+      return engine.transaction((t) => fn(embedded(t, close)));
+    },
+    close,
+  };
+  return db;
+}
+function remote(engine: postgres.Sql, close: () => Promise<void>): Db {
+  const db: Db = {
+    async query<T>(sql: string, params: Params = []) {
+      return normalize<T>(
+        await engine.unsafe(sql, params as postgres.ParameterOrJSON<never>[]),
+      );
+    },
+    async one<T>(sql: string, params?: Params) {
+      return (await db.query<T>(sql, params))[0];
+    },
+    async execute(sql: string, params: Params = []) {
+      const rows = await engine.unsafe(
+        sql,
+        params as postgres.ParameterOrJSON<never>[],
+      );
+      return { changes: rows.count };
+    },
+    async exec(sql: string) {
+      await engine.unsafe(sql);
+    },
+    async tx<T>(fn: (t: Db) => Promise<T>) {
+      return (await engine.begin((t) =>
+        fn(remote(t as unknown as postgres.Sql, close)),
+      )) as T;
+    },
+    close,
+  };
+  return db;
+}
+const globalDb = globalThis as unknown as { __alunsinaDb?: Promise<Db> };
+export function getDb(): Promise<Db> {
+  if (!globalDb.__alunsinaDb) {
+    globalDb.__alunsinaDb = (async () => {
+      if (process.env.DATABASE_URL) {
+        const url = new URL(process.env.DATABASE_URL);
+        const sql = postgres(process.env.DATABASE_URL, {
+          prepare: false,
+          ssl: ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname)
+            ? false
+            : "require",
+        });
+        return remote(sql, () => sql.end());
+      }
+      await mkdir(DB_PATH, { recursive: true });
+      const engine = new PGlite(DB_PATH);
+      await engine.waitReady;
+      const db = embedded(engine, () => engine.close());
+      await applyMigrations(db);
+      return db;
+    })().catch((error) => {
+      delete globalDb.__alunsinaDb;
+      throw error;
+    });
+  }
+  return globalDb.__alunsinaDb;
+}
+export const json = <T>(value: unknown, fallback: T): T => {
+  if (value == null) return fallback;
+  if (typeof value !== "string") return value as T;
   try {
-    return JSON.parse(s) as T;
+    return JSON.parse(value) as T;
   } catch {
     return fallback;
   }

@@ -16,13 +16,13 @@ export const metadata: Metadata = {
   description: "Discover stories beyond the headlines: browse by topic, region, source type, and language.",
 };
 
-export default function ExplorePage() {
-  const topics = topicIndex();
-  const places = placeStoryCounts();
-  const typeCounts = sourceTypeCounts();
-  const langs = languageCounts();
-  const trending = trendingSubjects();
-  const blindspots = listBlindspots({ limit: 50 })
+export default async function ExplorePage() {
+  const topics = await topicIndex();
+  const places = await placeStoryCounts();
+  const typeCounts = await sourceTypeCounts();
+  const langs = await languageCounts();
+  const trending = await trendingSubjects();
+  const blindspots = (await listBlindspots({ limit: 50 }))
     .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt))
     .slice(0, 4);
 

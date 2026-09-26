@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   if (running) return Response.json({ error: "an ingest run is already in progress" }, { status: 409 });
   running = true;
   try {
-    const summary = await runIngest(getDb());
+    const summary = await runIngest(await getDb());
     return Response.json(summary);
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });

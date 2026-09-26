@@ -16,7 +16,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/search">): 
 
 export default async function SearchPage({ searchParams }: PageProps<"/search">) {
   const q = qOf((await searchParams).q).slice(0, 200);
-  const results = q ? search(q, 40) : [];
+  const results = q ? (await search(q, 40)) : [];
 
   return (
     <div className={`${CONTAINER} max-w-[960px] pt-8 md:pt-10`}>

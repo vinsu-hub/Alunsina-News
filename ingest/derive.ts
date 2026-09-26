@@ -7,7 +7,7 @@
  *  - evidence: primary documents and official statements in the cluster
  *  - fact_checks: links fact-check items to the most similar story
  */
-import type { DatabaseSync } from "node:sqlite";
+import { json, type Db } from "../db/client";
 import { SOURCE_TYPE_IDS, type SourceTypeId } from "../lib/taxonomy";
 import { bigrams, centroid, cosine, entities, idfFrom, splitSentences, stripLead, termFreq, tfidf, tokenize, type Vec } from "./text";
 
@@ -25,20 +25,16 @@ export interface MemberRow {
   language: string;
 }
 
-export function loadMembers(db: DatabaseSync, storyId: string): MemberRow[] {
+export async function loadMembers(db: Db, storyId: string): Promise<MemberRow[]> {
   return (
-    db
-      .prepare(
-        `SELECT a.id, a.source_id, s.name, s.type, s.regions, a.headline, a.excerpt, a.url, a.published_at, a.region, a.language
-         FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.story_id = ? ORDER BY a.published_at ASC`,
-      )
-      .all(storyId) as Record<string, string | null>[]
+    (await db.query(`SELECT a.id, a.source_id, s.name, s.type, s.regions, a.headline, a.excerpt, a.url, a.published_at, a.region, a.language
+         FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.story_id = $1 ORDER BY a.published_at ASC`, [storyId])) as Record<string, string | null>[]
   ).map((r) => ({
     id: r.id!,
     sourceId: r.source_id!,
     sourceName: r.name!,
     sourceType: r.type as SourceTypeId,
-    sourceRegions: JSON.parse(r.regions ?? "[]"),
+    sourceRegions: json(r.regions, []),
     headline: r.headline!,
     excerpt: r.excerpt ?? "",
     url: r.url!,
@@ -56,7 +52,7 @@ const vecs = (ms: MemberRow[]) => {
 
 /* ---------- summary ---------- */
 
-const SUMMARY_TYPE_PREF: SourceTypeId[] = ["national", "regional", "independent", "community", "state", "government", "primary"];
+const SUMMARY_TYPE_PREF: SourceTypeId[] = ["national", "regional", "independent", "journalist", "community", "state", "government", "primary"];
 
 export function extractiveSummary(ms: MemberRow[]): string {
   const { vs, idf } = vecs(ms);
@@ -170,6 +166,7 @@ const FIRST_LABEL: Record<SourceTypeId, string> = {
   national: "National outlets begin reporting",
   regional: "Regional reports emerge",
   independent: "Independent reporting published",
+  journalist: "Independent journalist reporting published",
   community: "Community reports appear",
   social: "Claim begins circulating online",
 };
@@ -192,44 +189,38 @@ export function timelineFor(ms: MemberRow[]) {
 
 /* ---------- persist ---------- */
 
-export function deriveStory(db: DatabaseSync, storyId: string) {
-  const ms = loadMembers(db, storyId);
+export async function deriveStory(db: Db, storyId: string) {
+  const ms = await loadMembers(db, storyId);
   if (!ms.length) return;
-  db.prepare(`UPDATE stories SET summary = ? WHERE id = ?`).run(extractiveSummary(ms), storyId);
+  await db.execute(`UPDATE stories SET summary = $1 WHERE id = $2`, [extractiveSummary(ms), storyId]);
 
-  db.prepare(`DELETE FROM story_emphasis WHERE story_id = ?`).run(storyId);
-  const ins = db.prepare(`INSERT INTO story_emphasis (story_id, source_type, points) VALUES (?,?,?)`);
+  await db.execute(`DELETE FROM story_emphasis WHERE story_id = $1`, [storyId]);
   const emph = emphasisByType(ms);
-  for (const t of SOURCE_TYPE_IDS) if (emph.has(t)) ins.run(storyId, t, JSON.stringify(emph.get(t)));
+  for (const t of SOURCE_TYPE_IDS) if (emph.has(t)) await db.execute(`INSERT INTO story_emphasis (story_id, source_type, points) VALUES ($1,$2,$3)`, [storyId, t, JSON.stringify(emph.get(t))]);
 
-  db.prepare(`DELETE FROM story_angles WHERE story_id = ?`).run(storyId);
-  const insA = db.prepare(`INSERT INTO story_angles (story_id, angle, share, note) VALUES (?,?,?,NULL)`);
-  for (const a of anglesFor(ms)) insA.run(storyId, a.angle, a.share);
+  await db.execute(`DELETE FROM story_angles WHERE story_id = $1`, [storyId]);
+  for (const a of anglesFor(ms)) await db.execute(`INSERT INTO story_angles (story_id, angle, share, note) VALUES ($1,$2,$3,NULL)`, [storyId, a.angle, a.share]);
 
-  db.prepare(`DELETE FROM timeline_events WHERE story_id = ?`).run(storyId);
-  const insT = db.prepare(`INSERT INTO timeline_events (story_id, at, label, source_type, article_id) VALUES (?,?,?,?,?)`);
-  for (const e of timelineFor(ms)) insT.run(storyId, e.at, e.label, e.type, e.articleId);
+  await db.execute(`DELETE FROM timeline_events WHERE story_id = $1`, [storyId]);
+  for (const e of timelineFor(ms)) await db.execute(`INSERT INTO timeline_events (story_id, at, label, source_type, article_id) VALUES ($1,$2,$3,$4,$5)`, [storyId, e.at, e.label, e.type, e.articleId]);
 
-  db.prepare(`DELETE FROM evidence WHERE story_id = ?`).run(storyId);
-  const insE = db.prepare(`INSERT INTO evidence (story_id, kind, title, publisher, url, published_at) VALUES (?,?,?,?,?,?)`);
+  await db.execute(`DELETE FROM evidence WHERE story_id = $1`, [storyId]);
   for (const m of ms) {
-    if (m.sourceType === "primary") insE.run(storyId, "document", m.headline, m.sourceName, m.url, m.publishedAt);
-    else if (m.sourceType === "government") insE.run(storyId, "statement", m.headline, m.sourceName, m.url, m.publishedAt);
+    if (m.sourceType === "primary") await db.execute(`INSERT INTO evidence (story_id, kind, title, publisher, url, published_at) VALUES ($1,$2,$3,$4,$5,$6)`, [storyId, "document", m.headline, m.sourceName, m.url, m.publishedAt]);
+    else if (m.sourceType === "government") await db.execute(`INSERT INTO evidence (story_id, kind, title, publisher, url, published_at) VALUES ($1,$2,$3,$4,$5,$6)`, [storyId, "statement", m.headline, m.sourceName, m.url, m.publishedAt]);
   }
 }
 
 /** Attach unlinked fact-checks from the last 7 days to the most similar story (if similar enough). */
-export function linkFactChecks(db: DatabaseSync, storyIds: string[], now = Date.now()) {
-  const fcs = db
-    .prepare(`SELECT id, claim FROM fact_checks WHERE story_id IS NULL AND published_at >= ?`)
-    .all(new Date(now - 7 * 86400_000).toISOString()) as { id: number; claim: string }[];
+export async function linkFactChecks(db: Db, storyIds: string[], now = Date.now()) {
+  const fcs = (await db.query(`SELECT id, claim FROM fact_checks WHERE story_id IS NULL AND published_at >= $1`, [new Date(now - 7 * 86400_000).toISOString()])) as { id: number; claim: string }[];
   if (!fcs.length || !storyIds.length) return 0;
-  const stories = storyIds.map((id) => ({ id, ms: loadMembers(db, id) }));
+  const stories = await Promise.all(storyIds.map(async (id) => ({ id, ms: await loadMembers(db, id) })));
   const docs = [...stories.map((s) => termFreq(tokenize(s.ms.map((m) => m.headline).join(" ")))), ...fcs.map((f) => termFreq(tokenize(f.claim)))];
   const idf = idfFrom(docs);
   const sv = stories.map((s, i) => ({ id: s.id, v: tfidf(docs[i], idf) }));
   let linked = 0;
-  fcs.forEach((f, i) => {
+  for (const [i, f] of fcs.entries()) {
     const v = tfidf(docs[stories.length + i], idf);
     let best: string | null = null, bestSim = 0;
     for (const s of sv) {
@@ -237,9 +228,9 @@ export function linkFactChecks(db: DatabaseSync, storyIds: string[], now = Date.
       if (sim > bestSim) [best, bestSim] = [s.id, sim];
     }
     if (best && bestSim >= 0.3) {
-      db.prepare(`UPDATE fact_checks SET story_id = ? WHERE id = ?`).run(best, f.id);
+      await db.execute(`UPDATE fact_checks SET story_id = $1 WHERE id = $2`, [best, f.id]);
       linked++;
     }
-  });
+  }
   return linked;
 }

@@ -9,7 +9,7 @@
  * single-source clusters stay as loose articles until another outlet reports.
  */
 import { createHash } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
+import type { Db } from "../db/client";
 import { CLUSTERING } from "../lib/thresholds";
 import type { SourceTypeId, StoryStatus } from "../lib/taxonomy";
 import { centroid, cosine, entities, idfFrom, jaccard, slugify, termFreq, tfidf, tokenize, type Vec } from "./text";
@@ -40,15 +40,11 @@ interface Cluster {
 const ENTITY_BOOST = 0.25;
 const MERGE_SIMILARITY = 0.45;
 
-export function loadWindow(db: DatabaseSync, now: number, hours: number = CLUSTERING.windowHours): WindowArticle[] {
+export async function loadWindow(db: Db, now: number, hours: number = CLUSTERING.windowHours): Promise<WindowArticle[]> {
   const since = new Date(now - hours * 3600_000).toISOString();
-  const rows = db
-    .prepare(
-      `SELECT a.id, a.story_id, a.source_id, s.type, a.headline, a.excerpt, a.published_at, a.region, a.language
+  const rows = (await db.query(`SELECT a.id, a.story_id, a.source_id, s.type, a.headline, a.excerpt, a.published_at, a.region, a.language
        FROM articles a JOIN sources s ON s.id = a.source_id
-       WHERE a.published_at >= ? OR a.story_id IN (SELECT id FROM stories WHERE updated_at >= ?)`,
-    )
-    .all(since, since) as Record<string, string | null>[];
+       WHERE a.published_at >= $1 OR a.story_id IN (SELECT id FROM stories WHERE updated_at >= $2)`, [since, since])) as Record<string, string | null>[];
   const tfs = rows.map((r) => termFreq(tokenize(r.excerpt ?? ""), 1, termFreq(tokenize(r.headline!), 2)));
   const idf = idfFrom(tfs);
   return rows.map((r, i) => ({
@@ -152,8 +148,8 @@ export interface ClusterResult {
   windowArticles: WindowArticle[];
 }
 
-export function cluster(db: DatabaseSync, now = Date.now()): ClusterResult {
-  const window = loadWindow(db, now);
+export async function cluster(db: Db, now = Date.now()): Promise<ClusterResult> {
+  const window = await loadWindow(db, now);
   const clusters = new Map<string, Cluster>(); // key: storyId or temp id
   const newCluster = (key: string, storyId: string | null): Cluster => {
     const c: Cluster = { storyId, members: [], sum: new Map(), ents: new Set(), u: null, last: 0 };
@@ -196,7 +192,7 @@ export function cluster(db: DatabaseSync, now = Date.now()): ClusterResult {
       if (cosine(unitOf(big), unitOf(small)) + ENTITY_BOOST * jaccard(big.ents, small.ents) < MERGE_SIMILARITY) continue;
       for (const m of small.members) join(big, m);
       if (small.storyId && !big.storyId) big.storyId = small.storyId;
-      else if (small.storyId) db.prepare(`DELETE FROM stories WHERE id = ?`).run(small.storyId); // articles re-pointed below
+      else if (small.storyId) await db.execute(`DELETE FROM stories WHERE id = $1`, [small.storyId]); // articles re-pointed below
       small.members = [];
       changed.add(big);
       merged++;
@@ -205,11 +201,6 @@ export function cluster(db: DatabaseSync, now = Date.now()): ClusterResult {
 
   const touched = new Set<string>();
   let created = 0;
-  const upStory = db.prepare(
-    `INSERT INTO stories (id,title,summary,status,topic,score,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)
-     ON CONFLICT(id) DO UPDATE SET status=excluded.status, topic=excluded.topic, score=excluded.score, updated_at=excluded.updated_at`,
-  );
-  const setStory = db.prepare(`UPDATE articles SET story_id = ? WHERE id = ?`);
   const recentCutoff = now - 3 * 3600_000;
 
   for (const c of clusters.values()) {
@@ -225,9 +216,10 @@ export function cluster(db: DatabaseSync, now = Date.now()): ClusterResult {
     }
     const topic = pickTopic(c.members.map((m) => `${m.headline} ${m.excerpt}`));
     const status = statusFor(first, last, times.filter((t) => t >= recentCutoff).length, now);
-    upStory.run(c.storyId, title, "", status, topic, scoreFor(c.members, now), new Date(first).toISOString(), new Date(last).toISOString());
+    await db.execute(`INSERT INTO stories (id,title,summary,status,topic,score,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT(id) DO UPDATE SET status=excluded.status, topic=excluded.topic, score=excluded.score, updated_at=excluded.updated_at`, [c.storyId, title, "", status, topic, scoreFor(c.members, now), new Date(first).toISOString(), new Date(last).toISOString()]);
     for (const m of c.members) if (m.storyId !== c.storyId) {
-      setStory.run(c.storyId, m.id);
+      await db.execute(`UPDATE articles SET story_id = $1 WHERE id = $2`, [c.storyId, m.id]);
       m.storyId = c.storyId;
     }
     if (changed.has(c) || c.members.some((m) => Date.parse(m.publishedAt) >= now - 6 * 3600_000)) touched.add(c.storyId);

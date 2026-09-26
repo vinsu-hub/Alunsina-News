@@ -14,14 +14,14 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export async function generateMetadata({ params }: PageProps<"/topics/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const topic = topicFromSlug(slug);
+  const topic = await topicFromSlug(slug);
   return { title: topic ?? "Topic not found", description: topic ? `Stories about ${topic}, compared across sources.` : undefined };
 }
 
 export default async function TopicPage({ params, searchParams }: PageProps<"/topics/[slug]">) {
   const { slug } = await params;
   const sp = await searchParams;
-  const topic = topicFromSlug(slug);
+  const topic = await topicFromSlug(slug);
   if (!topic) notFound();
 
   const regionParam = one(sp.region);
@@ -29,8 +29,8 @@ export default async function TopicPage({ params, searchParams }: PageProps<"/to
   const regionId = REGIONS.find((r) => r.id === regionParam)?.id as RegionId | undefined;
   const langId = LANGUAGES.find((l) => l.id === langParam)?.id as LanguageId | undefined;
 
-  const stories = listStories({ topic, region: regionId, language: langId, limit: 40 });
-  const facets = topicFacets(topic);
+  const stories = await listStories({ topic, region: regionId, language: langId, limit: 40 });
+  const facets = await topicFacets(topic);
   const base = `/topics/${slug}`;
   const href = (region?: string, language?: string) => {
     const q = new URLSearchParams();

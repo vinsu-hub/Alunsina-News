@@ -23,7 +23,7 @@ import { plural } from "@/lib/format";
 
 export async function generateMetadata({ params }: PageProps<"/regions/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const place = getPlace(id);
+  const place = await getPlace(id);
   if (!place) return { title: "Region not found" };
   return {
     title: place.kind === "region" ? `${place.label} (${place.name})` : place.label,
@@ -33,20 +33,20 @@ export async function generateMetadata({ params }: PageProps<"/regions/[id]">): 
 
 export default async function RegionPage({ params }: PageProps<"/regions/[id]">) {
   const { id } = await params;
-  const place = getPlace(id);
+  const place = await getPlace(id);
   if (!place) notFound();
 
   const national = place.kind === "national";
   const stories = national
-    ? listStories({ sourceType: "national", limit: 24 })
+    ? (await listStories({ sourceType: "national", limit: 24 }))
     : place.kind === "island"
-      ? listStories({ island: place.id, limit: 24 })
-      : listStories({ region: place.regionIds[0], limit: 24 });
-  const sources = national ? listSources({ type: "national" }) : sourcesInRegions(place.regionIds);
-  const local = national ? [] : localReporting(place.regionIds);
-  const comparison = national ? null : regionComparison(place.regionIds);
-  const counts = placeStoryCounts();
-  const coverage = placeCoverage(place);
+      ? (await listStories({ island: place.id, limit: 24 }))
+      : (await listStories({ region: place.regionIds[0], limit: 24 }));
+  const sources = national ? (await listSources({ type: "national" })) : (await sourcesInRegions(place.regionIds));
+  const local = national ? [] : (await localReporting(place.regionIds));
+  const comparison = national ? null : (await regionComparison(place.regionIds));
+  const counts = await placeStoryCounts();
+  const coverage = await placeCoverage(place);
   const island = place.island ? ISLAND_GROUPS.find((g) => g.id === place.island)! : null;
   const subRegions = place.kind === "island" ? REGIONS.filter((r) => r.island === place.id) : [];
 

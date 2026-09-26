@@ -2,7 +2,7 @@
 // (ids prefixed `sample-`, links to example.org) so demo headlines are never
 // attributed to real outlets. `npm run seed` resets the DB to this edition.
 import { createHash } from "node:crypto";
-import { getDb } from "./client";
+import { getDb, type Db } from "./client";
 import type { LanguageId, RegionId, SourceTypeId } from "../lib/taxonomy";
 
 const H = 3600_000;
@@ -21,6 +21,7 @@ type S = {
 };
 
 const SOURCES: S[] = [
+  { id: "sample-reporter-lake", name: "Fictional Lake Reporter (sample)", type: "journalist", ownership: "Individually owned by Fictional Lake Reporter (sample)", regions: ["r4a"], languages: ["en"] },
   { id: "sample-national-daily", name: "The National Daily (sample)", type: "national", ownership: "Sample Media Holdings, Inc.", regions: ["ncr"], languages: ["en"], paywalled: true },
   { id: "sample-metro-broadcast", name: "Metro Broadcast News (sample)", type: "national", ownership: "Sample Broadcasting Network", regions: ["ncr"], languages: ["en", "fil"] },
   { id: "sample-balita", name: "Balita Ngayon (sample)", type: "national", ownership: "Sample Tabloid Publishing Corp.", regions: ["ncr"], languages: ["fil"] },
@@ -346,6 +347,8 @@ const STORIES: StorySeed[] = [
     topic: "Environment",
     score: 20,
     articles: [
+      ["sample-reporter-lake", "Lake residents discuss rehabilitation plans (sample)", "Fictional reporting about local lake rehabilitation plans.", 13, "en", "r4a"],
+      ["sample-reporter-lake", "Fishers ask for clear lake cleanup timeline (sample)", "Fictional reporting about community requests for the cleanup schedule.", 12, "en", "r4a"],
       ["sample-calabarzon", "San Pablo begins Seven Lakes rehabilitation", "The city will cap fish cages in Sampaloc Lake.", 16, "en", "r4a"],
       ["sample-laguna-radio", "Paglilinis sa Sampaloc Lake, sinimulan", "Nakiisa ang mga residente at mangingisda.", 14, "fil", "r4a"],
     ],
@@ -355,49 +358,64 @@ const STORIES: StorySeed[] = [
 
 const hash = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 16);
 
-export function seed() {
-  const db = getDb();
-  db.exec(`DELETE FROM fact_checks; DELETE FROM evidence; DELETE FROM timeline_events; DELETE FROM blindspots;
-           DELETE FROM story_angles; DELETE FROM story_emphasis; DELETE FROM articles; DELETE FROM stories;
-           DELETE FROM sources WHERE id LIKE 'sample-%';`);
+export async function seed() {
+  const connection = await getDb();
+  return connection.tx(async (db) => {
+    await db.exec(`DELETE FROM ingest_runs; DELETE FROM commentary; DELETE FROM story_links; DELETE FROM contributors WHERE is_sample = true; DELETE FROM fact_checks; DELETE FROM evidence; DELETE FROM timeline_events; DELETE FROM blindspots;
+             DELETE FROM story_angles; DELETE FROM story_emphasis; DELETE FROM articles; DELETE FROM stories;
+             DELETE FROM sources;`);
 
-  const insSource = db.prepare(`INSERT OR REPLACE INTO sources
-    (id,name,type,ownership,ownership_source,data_status,paywalled,homepage,feed_url,regions,languages,topics,active)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)`);
-  for (const s of SOURCES) {
-    insSource.run(
-      s.id, s.name, s.type, s.ownership, "Sample data", s.dataStatus ?? "feed", s.paywalled ? 1 : 0,
-      `https://example.org/${s.id}`, null, JSON.stringify(s.regions), JSON.stringify(s.languages), "[]",
-    );
-  }
-
-  const insStory = db.prepare(`INSERT INTO stories (id,title,summary,status,topic,score,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`);
-  const insArticle = db.prepare(`INSERT INTO articles (id,source_id,story_id,headline,byline,url,excerpt,published_at,language,region,fetched_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
-  const insEmph = db.prepare(`INSERT INTO story_emphasis (story_id,source_type,points) VALUES (?,?,?)`);
-  const insAngle = db.prepare(`INSERT INTO story_angles (story_id,angle,share,note) VALUES (?,?,?,?)`);
-  const insBlind = db.prepare(`INSERT INTO blindspots (story_id,type,reason,example,link_label,link_href,detected_at) VALUES (?,?,?,?,?,?,?)`);
-  const insTime = db.prepare(`INSERT INTO timeline_events (story_id,at,label,source_type,article_id) VALUES (?,?,?,?,?)`);
-  const insEv = db.prepare(`INSERT INTO evidence (story_id,kind,title,publisher,url,published_at) VALUES (?,?,?,?,?,?)`);
-
-  for (const s of STORIES) {
-    const created = Math.max(...s.articles.map((a) => a[3]));
-    const updated = Math.min(...s.articles.map((a) => a[3]));
-    insStory.run(s.id, s.title, s.summary, s.status, s.topic, s.score, ago(created), ago(updated));
-    for (const [src, headline, excerpt, h, lang, region] of s.articles) {
-      const url = `https://example.org/${src}/${hash(headline)}`;
-      insArticle.run(hash(url), src, s.id, headline, null, url, excerpt, ago(h), lang, region, ago(h));
+    for (const s of SOURCES) {
+      await db.execute(`INSERT INTO sources
+      (id,name,type,ownership,ownership_source,data_status,paywalled,homepage,feed_url,regions,languages,topics,active)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1)`, [s.id, s.name, s.type, s.ownership, "Sample data", s.dataStatus ?? "feed", s.paywalled ? 1 : 0, `https://example.org/${s.id}`, null, JSON.stringify(s.regions), JSON.stringify(s.languages), "[]"]);
     }
-    for (const [t, pts] of Object.entries(s.emphasis ?? {})) insEmph.run(s.id, t, JSON.stringify(pts));
-    for (const [angle, share, note] of s.angles ?? []) insAngle.run(s.id, angle, share, note ?? null);
-    for (const b of s.blindspots ?? [])
-      insBlind.run(s.id, b.type, b.reason, b.example, b.linkLabel ?? null, b.linkHref ?? null, ago(0.5));
-    for (const [h, label, type] of s.timeline ?? []) insTime.run(s.id, ago(h), label, type ?? null, null);
-    for (const e of s.evidence ?? [])
-      insEv.run(s.id, e.kind, e.title, e.publisher, `https://example.org/evidence/${hash(e.title)}`, e.hoursAgo ? ago(e.hoursAgo) : null);
-  }
-  return { sources: SOURCES.length, stories: STORIES.length, articles: STORIES.reduce((a, s) => a + s.articles.length, 0) };
+
+    for (const s of STORIES) {
+      const created = Math.max(...s.articles.map((a) => a[3]));
+      const updated = Math.min(...s.articles.map((a) => a[3]));
+      await db.execute(`INSERT INTO stories (id,title,summary,status,topic,score,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [s.id, s.title, s.summary, s.status, s.topic, s.score, ago(created), ago(updated)]);
+      for (const [src, headline, excerpt, h, lang, region] of s.articles) {
+        const url = `https://example.org/${src}/${hash(headline)}`;
+        await db.execute(`INSERT INTO articles (id,source_id,story_id,headline,byline,url,excerpt,published_at,language,region,fetched_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [hash(url), src, s.id, headline, null, url, excerpt, ago(h), lang, region, ago(h)]);
+      }
+      for (const [t, pts] of Object.entries(s.emphasis ?? {})) await db.execute(`INSERT INTO story_emphasis (story_id,source_type,points) VALUES ($1,$2,$3)`, [s.id, t, JSON.stringify(pts)]);
+      for (const [angle, share, note] of s.angles ?? []) await db.execute(`INSERT INTO story_angles (story_id,angle,share,note) VALUES ($1,$2,$3,$4)`, [s.id, angle, share, note ?? null]);
+      for (const b of s.blindspots ?? [])
+        await db.execute(`INSERT INTO blindspots (story_id,type,reason,example,link_label,link_href,detected_at) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [s.id, b.type, b.reason, b.example, b.linkLabel ?? null, b.linkHref ?? null, ago(0.5)]);
+      for (const [h, label, type] of s.timeline ?? []) await db.execute(`INSERT INTO timeline_events (story_id,at,label,source_type,article_id) VALUES ($1,$2,$3,$4,$5)`, [s.id, ago(h), label, type ?? null, null]);
+      for (const e of s.evidence ?? [])
+        await db.execute(`INSERT INTO evidence (story_id,kind,title,publisher,url,published_at) VALUES ($1,$2,$3,$4,$5,$6)`, [s.id, e.kind, e.title, e.publisher, `https://example.org/evidence/${hash(e.title)}`, e.hoursAgo ? ago(e.hoursAgo) : null]);
+    }
+    await seedContributors(db);
+    return { sources: SOURCES.length, stories: STORIES.length, articles: STORIES.reduce((a, s) => a + s.articles.length, 0) };
+  });
 }
 
-if (process.argv[1]?.endsWith("seed.ts")) {
-  console.log("Seeded sample edition:", seed());
+async function main() {
+  const db = await getDb();
+  try { console.log("Seeded sample edition:", await seed()); } finally { await db.close(); }
+}
+if (process.argv[1]?.endsWith("seed.ts")) main().catch((error) => { console.error(error); process.exitCode = 1; });
+
+async function seedContributors(db: Db) {
+  const people = [
+    ["sample-prof-river", "Professor Fictional River (sample)", "expert", "Environment/Climate Policy", "Fictional PhD in environmental policy", "Imaginary University (sample)"],
+    ["sample-dr-harvest", "Dr. Fictional Harvest (sample)", "expert", "Economics", "Fictional PhD in economics", "Imaginary Policy Institute (sample)"],
+    ["sample-reporter-lake", "Fictional Lake Reporter (sample)", "journalist", null, "Fictional local reporting portfolio", "Independent (sample)"],
+    ["sample-reporter-field", "Fictional Field Reporter (sample)", "journalist", null, "Fictional agriculture reporting portfolio", "Independent (sample)"],
+  ];
+  for (const [id, name, kind, field, credentials, affiliation] of people) {
+    await db.execute(`INSERT INTO contributors(id,name,kind,field,credentials,affiliation,conflicts,bio,portfolio_url,is_sample)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true)`, [id,name,kind,field,credentials,affiliation,JSON.stringify(["Fictional sample content; no real affiliations or declared interests"]), "Fictional contributor created for the sample edition. Analysis — Not Reporting.", `https://example.org/contributors/${id}`]);
+  }
+  const flood = "metro-manila-lgus-prepare-flooding";
+  const rice = STORIES.find((s) => s.id.includes("rice"))!.id;
+  const pieces = [
+    ["sample-flood-analysis", flood, "sample-prof-river", "Flood preparedness and regional coordination (sample)", "Sample analysis: Flood preparation involves connected watersheds, so city boundaries alone cannot explain who bears the risk. Readers can compare official preparations with reporting from upstream communities and look for published evacuation plans. This fictional commentary illustrates a policy perspective; it adds no reporting sources."],
+    ["sample-rice-analysis", rice, "sample-dr-harvest", "Reading the rice price story (sample)", "Sample analysis: Retail prices reflect production, transport and distribution costs. A change in an import rule may affect those costs on different timelines. Comparing regional prices with official data helps frame questions about who benefits. This is fictional expert commentary, not new reporting."],
+    ["sample-flood-local-analysis", flood, "sample-reporter-lake", "Questions from outside the capital (sample)", "Sample analysis: Provincial accounts can highlight evacuation access, transport interruptions and livelihoods that are absent from a capital-focused summary. This fictional reflection explains why local perspectives matter and does not introduce independently verified findings."],
+  ];
+  for (const [id,story,contributor,title,body] of pieces) await db.execute(`INSERT INTO commentary(id,story_id,contributor_id,title,body,published_at,is_sample) VALUES ($1,$2,$3,$4,$5,$6,true)`, [id,story,contributor,title,body,ago(1)]);
+  for (const [story,related,relation,confidence] of [[flood,"san-pablo-lakes-cleanup","developing",0.7],[rice,"inflation-september","earlier",0.85],["inflation-september",rice,"later",0.85],[flood,"deped-class-schedule","developing",0.5]]) await db.execute(`INSERT INTO story_links(story_id,related_story_id,relation,confidence) VALUES ($1,$2,$3,$4)`,[story,related,relation,confidence]);
 }

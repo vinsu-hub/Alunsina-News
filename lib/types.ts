@@ -31,6 +31,8 @@ export interface Article {
   byline: string | null;
   url: string;
   excerpt: string;
+  imageUrl: string | null;
+  imageCredit: string | null;
   publishedAt: string; // ISO
   language: LanguageId;
   region: RegionId | null;
@@ -55,6 +57,7 @@ export interface StorySummary {
   updatedAt: string;
   stats: StoryStats;
   leadSource: Source | null;
+  leadImage: { url: string; credit: string } | null;
 }
 
 export interface Emphasis {
@@ -149,3 +152,43 @@ export interface SourceProfile extends Source {
   stories: StorySummary[];
   coverage: RegionCoverage[];
 }
+
+export interface Contributor {
+  id: string;
+  name: string;
+  kind: "journalist" | "expert";
+  field: import("./taxonomy").ExpertField | null;
+  credentials: string;
+  affiliation: string | null;
+  conflicts: string[];
+  bio: string;
+  portfolioUrl: string | null;
+  isSample: boolean;
+  createdAt: string;
+}
+export interface Commentary {
+  id: string;
+  storyId: string;
+  contributorId: string;
+  title: string;
+  body: string;
+  publishedAt: string;
+  isSample: boolean;
+  label: "Analysis — Not Reporting";
+  contributor: Contributor;
+}
+export interface ContributorProfile extends Contributor { commentary: Commentary[] }
+export type StoryRelation = "earlier" | "later" | "developing";
+export interface RelatedStory extends StorySummary { relation: StoryRelation; confidence: number }
+export interface MagnifiedNewsEntry extends StorySummary {
+  byline: string;
+  coverageChip: { sources: number; regions: number };
+}
+export interface FlagInput {
+  kind: "coverage_mismatch" | "related_mismatch" | "source_miscategorized";
+  storyId?: string | null;
+  targetId: string;
+  note: string;
+}
+export interface Flag extends FlagInput { id: number; createdAt: string; status: string }
+export interface NewsletterSignup { email: string; createdAt: string; confirmed: boolean }

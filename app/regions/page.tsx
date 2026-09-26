@@ -10,8 +10,8 @@ export const metadata: Metadata = {
   description: "Philippine news by island group and region: Luzon, Visayas, Mindanao, and all regions.",
 };
 
-export default function RegionsPage() {
-  const counts = placeStoryCounts();
+export default async function RegionsPage() {
+  const counts = await placeStoryCounts();
   return (
     <>
       <div className={CONTAINER}>

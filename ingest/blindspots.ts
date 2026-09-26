@@ -4,7 +4,7 @@
  * renders verbatim. Every flag carries a concrete, numeric reason and a link
  * into the story. A Social blindspot is suppressed once a fact-check is linked.
  */
-import type { DatabaseSync } from "node:sqlite";
+import type { Db } from "../db/client";
 import { BLINDSPOT_RULES as R } from "../lib/thresholds";
 import { REGIONS, type BlindspotTypeId } from "../lib/taxonomy";
 import { anglesFor, loadMembers, type MemberRow } from "./derive";
@@ -155,17 +155,14 @@ export function detect(ms: MemberRow[], storyId: string, title: string, ctx: { h
   return flags;
 }
 
-export function detectBlindspots(db: DatabaseSync, storyId: string, now = Date.now()): number {
-  const story = db.prepare(`SELECT title FROM stories WHERE id = ?`).get(storyId) as { title: string } | undefined;
+export async function detectBlindspots(db: Db, storyId: string, now = Date.now()): Promise<number> {
+  const story = (await db.one(`SELECT title FROM stories WHERE id = $1`, [storyId])) as { title: string } | undefined;
   if (!story) return 0;
-  const ms = loadMembers(db, storyId);
-  const hasFactCheck = Boolean(db.prepare(`SELECT 1 FROM fact_checks WHERE story_id = ? LIMIT 1`).get(storyId));
+  const ms = await loadMembers(db, storyId);
+  const hasFactCheck = Boolean(await db.one(`SELECT 1 FROM fact_checks WHERE story_id = $1 LIMIT 1`, [storyId]));
   const flags = detect(ms, storyId, story.title, { hasFactCheck, now });
-  db.prepare(`DELETE FROM blindspots WHERE story_id = ?`).run(storyId);
-  const ins = db.prepare(
-    `INSERT INTO blindspots (story_id, type, reason, example, link_label, link_href, detected_at) VALUES (?,?,?,?,?,?,?)`,
-  );
+  await db.execute(`DELETE FROM blindspots WHERE story_id = $1`, [storyId]);
   const at = new Date(now).toISOString();
-  for (const f of flags) ins.run(storyId, f.type, f.reason, f.example, f.linkLabel, f.linkHref, at);
+  for (const f of flags) await db.execute(`INSERT INTO blindspots (story_id, type, reason, example, link_label, link_href, detected_at) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [storyId, f.type, f.reason, f.example, f.linkLabel, f.linkHref, at]);
   return flags.length;
 }

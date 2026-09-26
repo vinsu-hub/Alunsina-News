@@ -2,9 +2,9 @@ import Link from "next/link";
 import { getLastIngest, getPlatformStats } from "@/lib/queries";
 import { timeAgo } from "@/lib/format";
 
-export function Footer() {
-  const stats = getPlatformStats();
-  const last = getLastIngest();
+export async function Footer() {
+  const stats = await getPlatformStats();
+  const last = await getLastIngest();
   return (
     <footer className="mt-16 border-t-[3px] border-ink bg-forest-dark pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-paper md:pb-0">
       <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-x-6 gap-y-8 px-4 py-8 md:py-10 md:grid-cols-[2fr_1fr_1fr_1fr] md:px-6">

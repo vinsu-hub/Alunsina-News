@@ -7,7 +7,8 @@ import Parser from "rss-parser";
 import { FEEDS, type FeedSource } from "../config/feeds";
 import { canonicalUrl, makeExcerpt, stripHtml } from "./normalize";
 
-const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+const UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 const TIMEOUT_MS = 25_000;
 const MAX_AGE_DAYS = 7;
 
@@ -18,6 +19,8 @@ export interface RawItem {
   url: string;
   excerpt: string;
   publishedAt: string;
+  imageUrl: string | null;
+  imageCredit: string | null;
 }
 
 export interface FetchResult {
@@ -26,8 +29,70 @@ export interface FetchResult {
   feedsOk: number;
 }
 
-type Item = Parser.Item & { creator?: string; "dc:creator"?: string; author?: string; contentSnippet?: string; summary?: string };
-const parser: Parser<object, Item> = new Parser({ timeout: TIMEOUT_MS });
+type Item = Parser.Item & {
+  mediaContent?: unknown;
+  mediaThumbnail?: unknown;
+  "content:encoded"?: string;
+  creator?: string;
+  "dc:creator"?: string;
+  author?: string;
+  contentSnippet?: string;
+  summary?: string;
+};
+const parser: Parser<object, Item> = new Parser({
+  timeout: TIMEOUT_MS,
+  customFields: {
+    item: [
+      ["media:content", "mediaContent", { keepArray: true }],
+      ["media:thumbnail", "mediaThumbnail", { keepArray: true }],
+      "content:encoded",
+    ],
+  },
+});
+
+/** Publisher-provided image only, never a relative or non-web URL. */
+export function extractItemImage(item: Item): string | null {
+  const valid = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    try {
+      const url = new URL(value.replace(/&amp;/g, "&"));
+      return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
+  };
+  const media = (value: unknown): string | null => {
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const url = media(entry);
+        if (url) return url;
+      }
+      return null;
+    }
+    if (!value || typeof value !== "object") return null;
+    const node = value as {
+      $?: { url?: string; type?: string; medium?: string };
+      url?: string;
+    };
+    if (node.$?.medium && node.$.medium !== "image") return null;
+    if (node.$?.type && !node.$.type.startsWith("image/")) return null;
+    return valid(node.$?.url ?? node.url);
+  };
+  const supplied = media(item.mediaContent) ?? media(item.mediaThumbnail);
+  if (supplied) return supplied;
+  if (item.enclosure?.type?.startsWith("image/")) {
+    const url = valid(item.enclosure.url);
+    if (url) return url;
+  }
+  for (const html of [item["content:encoded"], item.content]) {
+    const src = html?.match(
+      /<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i,
+    );
+    const url = valid(src?.[1] ?? src?.[2] ?? src?.[3]);
+    if (url) return url;
+  }
+  return null;
+}
 
 async function fetchText(url: string): Promise<string> {
   const ctrl = new AbortController();
@@ -35,7 +100,11 @@ async function fetchText(url: string): Promise<string> {
   try {
     const res = await fetch(url, {
       signal: ctrl.signal,
-      headers: { "User-Agent": UA, Accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.5" },
+      headers: {
+        "User-Agent": UA,
+        Accept:
+          "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.5",
+      },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.text();
@@ -52,7 +121,11 @@ export function cleanHeadline(h: string): string {
     .trim();
 }
 
-async function fetchFeed(source: FeedSource, url: string, now: number): Promise<RawItem[]> {
+async function fetchFeed(
+  source: FeedSource,
+  url: string,
+  now: number,
+): Promise<RawItem[]> {
   const feed = await parser.parseString(await fetchText(url));
   const cutoff = now - MAX_AGE_DAYS * 86400_000;
   const out: RawItem[] = [];
@@ -69,12 +142,17 @@ async function fetchFeed(source: FeedSource, url: string, now: number): Promise<
       url: canonicalUrl(it.link),
       excerpt: makeExcerpt(body),
       publishedAt: new Date(published).toISOString(),
+      imageUrl: extractItemImage(it),
+      imageCredit: extractItemImage(it) ? source.name : null,
     });
   }
   return out;
 }
 
-export async function fetchAll(now = Date.now(), sources = FEEDS.filter((f) => f.verified && f.feeds.length)): Promise<FetchResult> {
+export async function fetchAll(
+  now = Date.now(),
+  sources = FEEDS.filter((f) => f.verified && f.feeds.length),
+): Promise<FetchResult> {
   const jobs = sources.flatMap((s) => s.feeds.map((url) => ({ s, url })));
   const items: RawItem[] = [];
   const errors: FetchResult["errors"] = [];
@@ -85,10 +163,19 @@ export async function fetchAll(now = Date.now(), sources = FEEDS.filter((f) => f
       while (i < jobs.length) {
         const { s, url } = jobs[i++];
         try {
-          items.push(...(await fetchFeed(s, url, now).catch(() => fetchFeed(s, url, now)))); // one retry
+          items.push(
+            ...(await fetchFeed(s, url, now).catch(() =>
+              fetchFeed(s, url, now),
+            )),
+          ); // one retry
           feedsOk++;
         } catch (e) {
-          const msg = e instanceof Error ? (e.name === "AbortError" ? "timeout" : e.message) : String(e);
+          const msg =
+            e instanceof Error
+              ? e.name === "AbortError"
+                ? "timeout"
+                : e.message
+              : String(e);
           errors.push({ source: s.id, url, error: msg.slice(0, 160) });
         }
       }
@@ -96,5 +183,9 @@ export async function fetchAll(now = Date.now(), sources = FEEDS.filter((f) => f
   );
   // Same article can appear in two feeds of one publisher (e.g. headlines + nation).
   const seen = new Set<string>();
-  return { items: items.filter((x) => !seen.has(x.url) && seen.add(x.url)), errors, feedsOk };
+  return {
+    items: items.filter((x) => !seen.has(x.url) && seen.add(x.url)),
+    errors,
+    feedsOk,
+  };
 }

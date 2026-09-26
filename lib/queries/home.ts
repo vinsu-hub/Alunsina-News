@@ -9,10 +9,10 @@ export type { AreaSummary } from "./home-types";
 export const isRegionId = (id: string): id is RegionId => REGIONS.some((r) => r.id === id);
 
 /** Counts plus the top three local stories for the My Area teaser. */
-export function getAreaSummary(regionId: RegionId): AreaSummary {
+export async function getAreaSummary(regionId: RegionId): Promise<AreaSummary> {
   const r = REGIONS.find((x) => x.id === regionId)!;
-  const feed = getAreaFeed(regionId);
-  const regional = listStories({ island: r.island, limit: 60 });
+  const feed = await getAreaFeed(regionId);
+  const regional = await listStories({ island: r.island, limit: 60 });
   return {
     region: { id: r.id, label: r.label, name: r.name, island: r.island },
     counts: {

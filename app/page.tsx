@@ -10,8 +10,8 @@ import { MyAreaTeaser } from "@/components/home/MyAreaTeaser";
 import { PhilippineCoverage } from "@/components/coverage/PhilippineCoverage";
 
 // Front page (§13). Opens straight into news; no hero.
-export default function Home() {
-  const e = getEdition();
+export default async function Home() {
+  const e = await getEdition();
   const lead = e.lead;
 
   return (

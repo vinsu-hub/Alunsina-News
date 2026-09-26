@@ -12,9 +12,9 @@ const COLORS = [
 ];
 const ICONS: IconName[] = ["search", "globe", "bell", "user", "home", "compass", "pin", "bookmark", "arrow", "external", "close", "menu", "columns", "locate", "alert", "doc"];
 
-export default function DesignPage() {
-  const [story] = listStories({ limit: 1 });
-  const edition = getEdition();
+export default async function DesignPage() {
+  const [story] = await listStories({ limit: 1 });
+  const edition = await getEdition();
   return (
     <div className="mx-auto max-w-[1100px] space-y-10 px-4 py-8 md:px-6 md:py-10">
       <header className="border-b border-rule pb-6">

@@ -6,11 +6,11 @@
  * output in place.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import type { DatabaseSync } from "node:sqlite";
+import type { Db } from "../db/client";
 import { SOURCE_TYPE_IDS, sourceType, type SourceTypeId } from "../lib/taxonomy";
 import { loadMembers } from "./derive";
 
-const MODEL = process.env.ALUNSINA_LLM_MODEL ?? "claude-opus-5";
+const MODEL = process.env.ALUNSINA_LLM_MODEL ?? "claude-sonnet-5";
 const MAX_STORIES = 15;
 
 const SYSTEM = `You summarize clusters of Philippine news reports for ALUNSINA NEWS, a news-comparison service.
@@ -50,18 +50,16 @@ interface LlmOut {
 export const llmEnabled = () =>
   process.env.ALUNSINA_LLM !== "off" && Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 
-export async function llmPass(db: DatabaseSync, storyIds: string[]): Promise<{ updated: number; errors: string[] }> {
+export async function llmPass(db: Db, storyIds: string[]): Promise<{ updated: number; errors: string[] }> {
   if (!llmEnabled() || !storyIds.length) return { updated: 0, errors: [] };
   const client = new Anthropic();
   const top = (
-    db
-      .prepare(`SELECT id FROM stories WHERE id IN (${storyIds.map(() => "?").join(",")}) ORDER BY score DESC LIMIT ?`)
-      .all(...storyIds, MAX_STORIES) as { id: string }[]
+    (await db.query(`SELECT id FROM stories WHERE id IN (${storyIds.map((_, i) => `$${i + 1}`).join(",")}) ORDER BY score DESC LIMIT $${storyIds.length + 1}`, [...storyIds, MAX_STORIES])) as { id: string }[]
   ).map((r) => r.id);
   let updated = 0;
   const errors: string[] = [];
   for (const id of top) {
-    const ms = loadMembers(db, id);
+    const ms = await loadMembers(db, id);
     const byType = new Map<SourceTypeId, string[]>();
     for (const m of ms.slice(-40)) {
       const lines = byType.get(m.sourceType) ?? [];
@@ -86,11 +84,10 @@ export async function llmPass(db: DatabaseSync, storyIds: string[]): Promise<{ u
       const text = res.content.find((b) => b.type === "text");
       if (!text || text.type !== "text") continue;
       const out = JSON.parse(text.text) as LlmOut;
-      if (out.summary?.trim()) db.prepare(`UPDATE stories SET summary = ? WHERE id = ?`).run(out.summary.trim().slice(0, 400), id);
+      if (out.summary?.trim()) await db.execute(`UPDATE stories SET summary = $1 WHERE id = $2`, [out.summary.trim().slice(0, 400), id]);
       const present = new Set(byType.keys());
-      const ins = db.prepare(`INSERT OR REPLACE INTO story_emphasis (story_id, source_type, points) VALUES (?,?,?)`);
-      for (const e of out.emphasis ?? [])
-        if (present.has(e.source_type) && e.points?.length) ins.run(id, e.source_type, JSON.stringify(e.points.slice(0, 3)));
+          for (const e of out.emphasis ?? [])
+        if (present.has(e.source_type) && e.points?.length) await db.execute(`INSERT INTO story_emphasis (story_id, source_type, points) VALUES ($1,$2,$3) ON CONFLICT(story_id,source_type) DO UPDATE SET points=excluded.points`, [id, e.source_type, JSON.stringify(e.points.slice(0, 3))]);
       updated++;
     } catch (e) {
       errors.push(`${id}: ${e instanceof Anthropic.APIError ? `API ${e.status}` : e instanceof Error ? e.message : String(e)}`.slice(0, 200));

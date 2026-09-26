@@ -12,8 +12,8 @@ export const metadata: Metadata = {
   description: "Every topic ALUNSINA NEWS tracks, with its latest stories.",
 };
 
-export default function TopicsPage() {
-  const topics = topicIndex();
+export default async function TopicsPage() {
+  const topics = await topicIndex();
   return (
     <>
       <div className={CONTAINER}>
@@ -23,8 +23,8 @@ export default function TopicsPage() {
       <div className={`${CONTAINER} pt-8`}>
         <SectionHead title="Topic Index" sub={`${topics.length} topics, A to Z`} />
         <ul className="grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-          {topics.map((t) => {
-            const latest = t.stories ? listStories({ topic: t.topic, limit: 2 }) : [];
+          {topics.map(async (t) => {
+            const latest = t.stories ? (await listStories({ topic: t.topic, limit: 2 })) : [];
             return (
               <li key={t.slug} className="border-t border-ink pt-2">
                 <Link href={`/topics/${t.slug}`} className="group flex items-baseline justify-between gap-3">

@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   description: "Philippine news in English, Filipino, and the regional languages.",
 };
 
-export default function LanguagesPage() {
-  const langs = languageCounts();
+export default async function LanguagesPage() {
+  const langs = await languageCounts();
   return (
     <>
       <div className={CONTAINER}>

@@ -7,7 +7,7 @@ import { REGIONS, SOURCE_TYPE_IDS, TOPICS, type RegionId, type SourceTypeId } fr
 import type { Source, StorySummary } from "@/lib/types";
 
 type Row = Record<string, unknown>;
-const all = (sql: string, ...p: (string | number)[]) => getDb().prepare(sql).all(...p) as Row[];
+const all = async (sql: string, ...p: (string | number)[]) => (await (await getDb()).query(sql, [...p])) as Row[];
 const sinceIso = (hours: number) => new Date(Date.now() - hours * 3600_000).toISOString();
 
 /** My Area looks at the last 72 hours of reporting; every empty state says so. */
@@ -24,10 +24,10 @@ export const isTopic = (x: string) => TOPICS.some((t) => t.toLowerCase() === x.t
  * (lib/queries.ts keeps its summary mapper private, so this goes through getStory
  * and trims to the StorySummary shape.)
  */
-export function getStorySummaries(ids: string[]): StorySummary[] {
+export async function getStorySummaries(ids: string[]): Promise<StorySummary[]> {
   const out: StorySummary[] = [];
   for (const id of [...new Set(ids)].slice(0, 100)) {
-    const d = getStory(id);
+    const d = await getStory(id);
     if (!d) continue;
     out.push({
       id: d.id,
@@ -38,6 +38,7 @@ export function getStorySummaries(ids: string[]): StorySummary[] {
       updatedAt: d.updatedAt,
       stats: d.stats,
       leadSource: d.leadSource,
+      leadImage: d.leadImage,
     });
   }
   return out;
@@ -79,41 +80,41 @@ export interface AreaFeed {
  * - government: stories with Government / State-Run / Primary reporting tagged to the region
  * - community: stories with Community-source reporting tagged to the region
  */
-export function getPersonalAreaFeed(region: RegionId, place: string, province: string): AreaFeed {
+export async function getPersonalAreaFeed(region: RegionId, place: string, province: string): Promise<AreaFeed> {
   const since = sinceIso(AREA_WINDOW_HOURS);
   const terms = placeTerms(place, province);
   const localIds = terms.length
-    ? all(
+    ? (await all(
         `SELECT DISTINCT a.story_id id FROM articles a JOIN stories st ON st.id = a.story_id
-         WHERE a.region = ? AND st.updated_at >= ?
-           AND (${terms.map(() => "(a.headline LIKE ? OR a.excerpt LIKE ?)").join(" OR ")})`,
+         WHERE a.region = $1 AND st.updated_at >= $2
+           AND (${terms.map((_, i) => `(a.headline ILIKE $${3 + i * 2} OR a.excerpt ILIKE $${4 + i * 2})`).join(" OR ")})`,
         region,
         since,
         ...terms.flatMap((t) => [`%${t}%`, `%${t}%`]),
-      ).map((r) => r.id as string)
+      )).map((r) => r.id as string)
     : [];
-  const local = getStorySummaries(localIds).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const local = (await getStorySummaries(localIds)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const localSet = new Set(localIds);
-  const inRegion = listStories({ region, sinceHours: AREA_WINDOW_HOURS, limit: MAX });
+  const inRegion = await listStories({ region, sinceHours: AREA_WINDOW_HOURS, limit: MAX });
   const regional = inRegion.filter((s) => !localSet.has(s.id));
-  const government = mergeRanked(
-    (["government", "state", "primary"] as const).map((t) =>
-      listStories({ region, sourceType: t, sinceHours: AREA_WINDOW_HOURS, limit: MAX }),
+  const government = mergeRanked(await Promise.all(
+    (["government", "state", "primary"] as const).map(async (t) =>
+      (await listStories({ region, sourceType: t, sinceHours: AREA_WINDOW_HOURS, limit: MAX })),
     ),
-  );
-  const community = listStories({ region, sourceType: "community", sinceHours: AREA_WINDOW_HOURS, limit: MAX });
-  const sources = listSources()
+  ));
+  const community = await listStories({ region, sourceType: "community", sinceHours: AREA_WINDOW_HOURS, limit: MAX });
+  const sources = (await listSources())
     .filter((s) => s.regions.includes(region))
     .sort((a, b) => b.articleCount - a.articleCount || a.name.localeCompare(b.name));
   return { region, windowHours: AREA_WINDOW_HOURS, local, regional, government, community, sources };
 }
 
 /** Stories matching any followed topic, region, or source type (OR), newest first. */
-export function getFollowingFeed(f: { topics: string[]; regions: RegionId[]; sourceTypes: SourceTypeId[] }) {
-  const lists: StorySummary[][] = [
-    ...f.topics.map((topic) => listStories({ topic, limit: MAX })),
-    ...f.regions.map((region) => listStories({ region, limit: MAX })),
-    ...f.sourceTypes.map((sourceType) => listStories({ sourceType, limit: MAX })),
-  ];
+export async function getFollowingFeed(f: { topics: string[]; regions: RegionId[]; sourceTypes: SourceTypeId[] }) {
+  const lists = await Promise.all([
+    ...f.topics.map(async (topic) => (await listStories({ topic, limit: MAX }))),
+    ...f.regions.map(async (region) => (await listStories({ region, limit: MAX }))),
+    ...f.sourceTypes.map(async (sourceType) => (await listStories({ sourceType, limit: MAX }))),
+  ]);
   return mergeRanked(lists).slice(0, 60);
 }

@@ -12,7 +12,7 @@ import { getTrendingTopics } from "@/lib/queries";
 const newsreader = Newsreader({ variable: "--font-newsreader", subsets: ["latin"], style: ["normal", "italic"] });
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
-// Every page reads the live SQLite edition; render per request.
+// Every page reads the live Postgres edition; render per request.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -22,8 +22,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#F4F1E8", viewportFit: "cover" };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
-  const trending = getTrendingTopics().map((t) => t.topic);
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const trending = (await getTrendingTopics()).map((t) => t.topic);
   return (
     <html lang="en" className={`${newsreader.variable} ${inter.variable}`}>
       <body className="min-h-dvh">

@@ -23,8 +23,8 @@ export default async function LanguagePage({ params }: PageProps<"/languages/[id
   const { id } = await params;
   const lang = find(id);
   if (!lang) notFound();
-  const stories = listStories({ language: lang.id as LanguageId, limit: 40 });
-  const counts = languageCounts();
+  const stories = await listStories({ language: lang.id as LanguageId, limit: 40 });
+  const counts = await languageCounts();
   const mine = counts.find((c) => c.id === lang.id)!;
 
   return (

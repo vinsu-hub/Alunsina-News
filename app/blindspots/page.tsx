@@ -16,7 +16,7 @@ export default async function BlindspotsPage({ searchParams }: PageProps<"/blind
   const sp = await searchParams;
   const raw = Array.isArray(sp.type) ? sp.type[0] : sp.type;
   const active = BLINDSPOT_TYPES.find((t) => t.id === raw)?.id as BlindspotTypeId | undefined;
-  const everything = listBlindspots({ limit: 200 });
+  const everything = await listBlindspots({ limit: 200 });
   const shown = active ? everything.filter((b) => b.type === active) : everything;
   const countFor = (id: BlindspotTypeId) => everything.filter((b) => b.type === id).length;
   const activeType = active ? BLINDSPOT_TYPES.find((t) => t.id === active)! : null;

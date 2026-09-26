@@ -18,7 +18,7 @@ import { coverageFromRegionCounts, getSource, listSources } from "@/lib/queries"
 import type { Article, Evidence } from "@/lib/types";
 
 type Row = Record<string, unknown>;
-const all = (sql: string, ...p: (string | number)[]) => getDb().prepare(sql).all(...p) as Row[];
+const all = async (sql: string, ...p: (string | number)[]) => (await (await getDb()).query(sql, [...p])) as Row[];
 const sinceIso = (hours: number) => new Date(Date.now() - hours * 3600_000).toISOString();
 
 /* ---------- places ---------- */
@@ -34,7 +34,7 @@ export interface Place {
   regionIds: RegionId[];
 }
 
-export function getPlace(id: string): Place | null {
+export async function getPlace(id: string): Promise<Place | null> {
   if (id === "national")
     return {
       id: "national",
@@ -62,10 +62,10 @@ export function getPlace(id: string): Place | null {
 /* ---------- index counts ---------- */
 
 /** Every topic (taxonomy + any extra topic seen in the data) with its story count. */
-export function topicIndex(): { topic: string; slug: string; stories: number }[] {
+export async function topicIndex(): Promise<{ topic: string; slug: string; stories: number }[]> {
   const counts = new Map<string, number>();
   for (const t of TOPICS) counts.set(t, 0);
-  for (const r of all(`SELECT topic, COUNT(*) n FROM stories GROUP BY topic`)) {
+  for (const r of (await all(`SELECT topic, COUNT(*)::int n FROM stories GROUP BY topic`))) {
     const known = [...counts.keys()].find((k) => k.toLowerCase() === String(r.topic).toLowerCase());
     const key = known ?? (r.topic as string);
     counts.set(key, (counts.get(key) ?? 0) + (r.n as number));
@@ -75,12 +75,12 @@ export function topicIndex(): { topic: string; slug: string; stories: number }[]
     .sort((a, b) => a.topic.localeCompare(b.topic));
 }
 
-export function topicFromSlug(slug: string): string | null {
-  return topicIndex().find((t) => t.slug === slug)?.topic ?? null;
+export async function topicFromSlug(slug: string): Promise<string | null> {
+  return (await topicIndex()).find((t) => t.slug === slug)?.topic ?? null;
 }
 
 /** Specific subjects, ranked by article volume; category indexes remain separate. */
-export function trendingSubjects() {
+export async function trendingSubjects() {
   const subjects = [
     ["Flood Control", "flood control"],
     ["Rice Prices", "rice prices"],
@@ -91,36 +91,36 @@ export function trendingSubjects() {
     ["EDSA Traffic", "EDSA"],
     ["Class Schedules", "class schedule"],
   ];
-  return subjects.map(([label, query]) => {
-    const row = all(`SELECT COUNT(DISTINCT st.id) stories, COUNT(a.id) articles
+  return (await Promise.all(subjects.map(async ([label, query]) => {
+    const row = (await all(`SELECT COUNT(DISTINCT st.id)::int stories, COUNT(a.id)::int articles
       FROM stories st JOIN articles a ON a.story_id = st.id
-      WHERE lower(st.title) LIKE ?`, `%${query.toLowerCase()}%`)[0];
+      WHERE lower(st.title) ILIKE $1`, `%${query.toLowerCase()}%`))[0];
     return { label, query, stories: Number(row.stories), articles: Number(row.articles) };
-  }).filter((s) => s.stories > 0).sort((a, b) => b.articles - a.articles || a.label.localeCompare(b.label));
+  }))).filter((s) => s.stories > 0).sort((a, b) => b.articles - a.articles || a.label.localeCompare(b.label));
 }
 
 /** Distinct stories touching each region (via region-tagged articles), plus island + national totals. */
-export function placeStoryCounts() {
+export async function placeStoryCounts() {
   const byRegion = new Map<string, number>(
-    all(
-      `SELECT region, COUNT(DISTINCT story_id) n FROM articles
+    (await all(
+      `SELECT region, COUNT(DISTINCT story_id)::int n FROM articles
        WHERE region IS NOT NULL AND story_id IS NOT NULL GROUP BY region`,
-    ).map((r) => [r.region as string, r.n as number]),
+    )).map((r) => [r.region as string, r.n as number]),
   );
   const byIsland = new Map<string, number>();
   for (const g of ISLAND_GROUPS) {
     const ids = REGIONS.filter((r) => r.island === g.id).map((r) => r.id);
-    const row = all(
-      `SELECT COUNT(DISTINCT story_id) n FROM articles
-       WHERE story_id IS NOT NULL AND region IN (${ids.map(() => "?").join(",")})`,
+    const row = (await all(
+      `SELECT COUNT(DISTINCT story_id)::int n FROM articles
+       WHERE story_id IS NOT NULL AND region IN (${ids.map((_, i) => `$${i + 1}`).join(",")})`,
       ...ids,
-    )[0];
+    ))[0];
     byIsland.set(g.id, (row?.n as number) ?? 0);
   }
-  const national = (all(
-    `SELECT COUNT(DISTINCT a.story_id) n FROM articles a JOIN sources s ON s.id = a.source_id
+  const national = ((await all(
+    `SELECT COUNT(DISTINCT a.story_id)::int n FROM articles a JOIN sources s ON s.id = a.source_id
      WHERE a.story_id IS NOT NULL AND s.type = 'national'`,
-  )[0]?.n as number) ?? 0;
+  ))[0]?.n as number) ?? 0;
   return {
     national,
     island: (id: IslandGroupId) => byIsland.get(id) ?? 0,
@@ -129,9 +129,9 @@ export function placeStoryCounts() {
 }
 
 /** Article and story counts per language, for all nine languages. */
-export function languageCounts(): { id: LanguageId; label: string; articles: number; stories: number }[] {
+export async function languageCounts(): Promise<{ id: LanguageId; label: string; articles: number; stories: number }[]> {
   const rows = new Map(
-    all(`SELECT language, COUNT(*) n, COUNT(DISTINCT story_id) st FROM articles GROUP BY language`).map((r) => [
+    (await all(`SELECT language, COUNT(*)::int n, COUNT(DISTINCT story_id)::int st FROM articles GROUP BY language`)).map((r) => [
       r.language as string,
       r,
     ]),
@@ -145,23 +145,23 @@ export function languageCounts(): { id: LanguageId; label: string; articles: num
 }
 
 /** Active source count per source type (all eight, zeros included). */
-export function sourceTypeCounts(): Record<SourceTypeId, number> {
+export async function sourceTypeCounts(): Promise<Record<SourceTypeId, number>> {
   const out = Object.fromEntries(SOURCE_TYPE_IDS.map((t) => [t, 0])) as Record<SourceTypeId, number>;
-  for (const r of all(`SELECT type, COUNT(*) n FROM sources WHERE active = 1 GROUP BY type`))
+  for (const r of (await all(`SELECT type, COUNT(*)::int n FROM sources WHERE active = 1 GROUP BY type`)))
     if (r.type as string in out) out[r.type as SourceTypeId] = r.n as number;
   return out;
 }
 
 /** Region and language facets for a topic (distinct stories), for the topic sidebar. */
-export function topicFacets(topic: string) {
-  const regions = all(
-    `SELECT a.region, COUNT(DISTINCT a.story_id) n FROM articles a JOIN stories st ON st.id = a.story_id
-     WHERE lower(st.topic) = lower(?) AND a.region IS NOT NULL GROUP BY a.region`,
+export async function topicFacets(topic: string) {
+  const regions = await all(
+    `SELECT a.region, COUNT(DISTINCT a.story_id)::int n FROM articles a JOIN stories st ON st.id = a.story_id
+     WHERE lower(st.topic) = lower($1) AND a.region IS NOT NULL GROUP BY a.region`,
     topic,
   );
-  const languages = all(
-    `SELECT a.language, COUNT(DISTINCT a.story_id) n FROM articles a JOIN stories st ON st.id = a.story_id
-     WHERE lower(st.topic) = lower(?) GROUP BY a.language`,
+  const languages = await all(
+    `SELECT a.language, COUNT(DISTINCT a.story_id)::int n FROM articles a JOIN stories st ON st.id = a.story_id
+     WHERE lower(st.topic) = lower($1) GROUP BY a.language`,
     topic,
   );
   return {
@@ -173,18 +173,18 @@ export function topicFacets(topic: string) {
 /* ---------- region comparison ---------- */
 
 /** Same edition and denominator for the scoped story cohort and national baseline. */
-export function placeCoverage(place: Place) {
+export async function placeCoverage(place: Place) {
   const condition = place.kind === "national"
     ? "SELECT a.story_id FROM articles a JOIN sources s ON s.id = a.source_id WHERE s.type = 'national'"
-    : `SELECT story_id FROM articles WHERE region IN (${place.regionIds.map(() => "?").join(",")})`;
-  const scoped = all(
-    `SELECT region, COUNT(*) n FROM articles WHERE region IS NOT NULL
+    : `SELECT story_id FROM articles WHERE region IN (${place.regionIds.map((_, i) => `$${i + 1}`).join(",")})`;
+  const scoped = await all(
+    `SELECT region, COUNT(*)::int n FROM articles WHERE region IS NOT NULL
      AND story_id IN (${condition}) GROUP BY region`,
     ...(place.kind === "national" ? [] : place.regionIds),
   );
-  const baseline = all(`SELECT region, COUNT(*) n FROM articles WHERE region IS NOT NULL GROUP BY region`);
-  const coverage = (rows: Row[]) => coverageFromRegionCounts(new Map(rows.map((r) => [r.region as string, r.n as number])));
-  return { coverage: coverage(scoped), compareTo: coverage(baseline) };
+  const baseline = await all(`SELECT region, COUNT(*)::int n FROM articles WHERE region IS NOT NULL GROUP BY region`);
+  const coverage = async (rows: Row[]) => (await coverageFromRegionCounts(new Map(rows.map((r) => [r.region as string, r.n as number]))));
+  return { coverage: await coverage(scoped), compareTo: await coverage(baseline) };
 }
 
 /**
@@ -226,7 +226,7 @@ export interface RegionComparison {
  * This place's share of region-tagged articles in the most recent window that has data
  * (last 24h, else 72h, else everything in the edition), against two labelled baselines.
  */
-export function regionComparison(regionIds: RegionId[]): RegionComparison {
+export async function regionComparison(regionIds: RegionId[]): Promise<RegionComparison> {
   const windows: [number | null, string][] = [
     [24, "the last 24 hours"],
     [72, "the last 3 days"],
@@ -236,8 +236,8 @@ export function regionComparison(regionIds: RegionId[]): RegionComparison {
   let windowLabel = windows[0][1];
   for (const [h, label] of windows) {
     rows = h
-      ? all(`SELECT region, COUNT(*) n FROM articles WHERE region IS NOT NULL AND published_at >= ? GROUP BY region`, sinceIso(h))
-      : all(`SELECT region, COUNT(*) n FROM articles WHERE region IS NOT NULL GROUP BY region`);
+      ? (await all(`SELECT region, COUNT(*)::int n FROM articles WHERE region IS NOT NULL AND published_at >= $1 GROUP BY region`, sinceIso(h)))
+      : (await all(`SELECT region, COUNT(*)::int n FROM articles WHERE region IS NOT NULL GROUP BY region`));
     windowLabel = label;
     if (rows.length) break;
   }
@@ -259,29 +259,29 @@ export function regionComparison(regionIds: RegionId[]): RegionComparison {
 /* ---------- sources & local reporting ---------- */
 
 /** Sources whose primary coverage area includes any of these regions. */
-export function sourcesInRegions(regionIds: RegionId[], types?: SourceTypeId[]) {
-  return listSources().filter(
+export async function sourcesInRegions(regionIds: RegionId[], types?: SourceTypeId[]) {
+  return (await listSources()).filter(
     (s) => s.regions.some((r) => regionIds.includes(r)) && (!types || types.includes(s.type)),
   );
 }
 
 /** Recent articles from regional and community outlets based in these regions. */
-export function localReporting(regionIds: RegionId[], limit = 8): Article[] {
-  return sourcesInRegions(regionIds, ["regional", "community"])
-    .flatMap((s) => getSource(s.id)?.recentArticles ?? [])
+export async function localReporting(regionIds: RegionId[], limit = 8): Promise<Article[]> {
+  return (await Promise.all((await sourcesInRegions(regionIds, ["regional", "community"]))
+    .map(async (s) => (await getSource(s.id))?.recentArticles ?? []))).flat()
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, limit);
 }
 
 /** Evidence (primary documents, statements, datasets) linked to stories this source covered. */
-export function evidenceForSource(sourceId: string, limit = 8): (Evidence & { storyId: string })[] {
-  return all(
+export async function evidenceForSource(sourceId: string, limit = 8): Promise<(Evidence & { storyId: string })[]> {
+  return (await all(
     `SELECT DISTINCT e.* FROM evidence e
-     WHERE e.story_id IN (SELECT story_id FROM articles WHERE source_id = ? AND story_id IS NOT NULL)
-     ORDER BY e.published_at DESC LIMIT ?`,
+     WHERE e.story_id IN (SELECT story_id FROM articles WHERE source_id = $1 AND story_id IS NOT NULL)
+     ORDER BY e.published_at DESC LIMIT $2`,
     sourceId,
     limit,
-  ).map((e) => ({
+  )).map((e) => ({
     kind: e.kind as Evidence["kind"],
     title: e.title as string,
     publisher: e.publisher as string,

@@ -42,6 +42,7 @@ export const SOURCE_TYPES = [
     description:
       "Non-conglomerate newsrooms, investigative centers, and nonprofit journalism outfits.",
   },
+  { id: "journalist", label: "Independent Journalist", short: "Journalist", description: "An individual reporter, verified by identity and portfolio, publishing original reporting." },
   {
     id: "community",
     label: "Community",
@@ -64,14 +65,15 @@ export const sourceType = (id: SourceTypeId) => SOURCE_TYPES.find((t) => t.id ==
 // Non-political, editorial palette for source types. Ordered roughly from
 // "closest to raw evidence" to "least verified". Never red/blue party coding.
 export const SOURCE_TYPE_COLORS: Record<SourceTypeId, string> = {
-  primary: "#092D27",
-  government: "#123F35",
-  state: "#4E6B5E",
-  national: "#8A8F7A",
-  regional: "#C49A45",
-  independent: "#B4513D",
-  community: "#7A4B3A",
-  social: "#C9C5B9",
+  primary: "#0F2F27",
+  government: "#1F4D3A",
+  state: "#5B6F63",
+  national: "#3E5C7A",
+  regional: "#B4513D",
+  independent: "#6B5A7E",
+  journalist: "#8A6F9E",
+  community: "#3F7A78",
+  social: "#B9B3A5",
 };
 
 export const BLINDSPOT_TYPES = [
@@ -200,3 +202,6 @@ export type DataStatusId = (typeof DATA_STATUSES)[number]["id"];
 export const dataStatus = (id: DataStatusId) => DATA_STATUSES.find((d) => d.id === id)!;
 
 export type StoryStatus = "developing" | "ongoing" | "settled";
+
+export const EXPERT_FIELDS = ["Political Science", "Public Administration/Governance", "Economics", "Law", "Environment/Climate Policy", "Public Health"] as const;
+export type ExpertField = (typeof EXPERT_FIELDS)[number];

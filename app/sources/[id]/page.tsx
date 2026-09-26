@@ -13,7 +13,7 @@ import { pct, plural, timeAgo } from "@/lib/format";
 
 export async function generateMetadata({ params }: PageProps<"/sources/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const s = getSource(id);
+  const s = await getSource(id);
   return s
     ? { title: s.name, description: `${s.name}: ${sourceType(s.type).label}. Ownership, data status, and coverage.` }
     : { title: "Source not found" };
@@ -28,11 +28,11 @@ const DATA_STATUS_EXPLAINED: Record<string, string> = {
 
 export default async function SourceProfilePage({ params }: PageProps<"/sources/[id]">) {
   const { id } = await params;
-  const s = getSource(id);
+  const s = await getSource(id);
   if (!s) notFound();
   const t = sourceType(s.type);
   const status = dataStatus(s.dataStatus);
-  const evidence = evidenceForSource(s.id);
+  const evidence = await evidenceForSource(s.id);
   const isPrimary = s.type === "primary" || s.type === "government";
   const maxShare = Math.max(...s.coverage.map((c) => c.share), 0.01);
 

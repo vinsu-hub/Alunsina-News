@@ -17,7 +17,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
   const sp = await searchParams;
   const raw = Array.isArray(sp.type) ? sp.type[0] : sp.type;
   const active = SOURCE_TYPES.find((t) => t.id === raw)?.id as SourceTypeId | undefined;
-  const sources = listSources();
+  const sources = await listSources();
   const groups = SOURCE_TYPES.filter((t) => !active || t.id === active).map((t) => ({
     ...t,
     sources: sources.filter((s) => s.type === t.id),

@@ -26,18 +26,18 @@ import { dateTime, earliest } from "@/components/story/util";
 
 export async function generateMetadata({ params }: PageProps<"/story/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const story = getStory(id);
+  const story = await getStory(id);
   if (!story) return { title: "Story not found" };
   return { title: story.title, description: story.summary };
 }
 
 export default async function StoryPage({ params }: PageProps<"/story/[id]">) {
   const { id } = await params;
-  const story = getStory(id);
+  const story = await getStory(id);
   if (!story) notFound();
 
   const firstReported = earliest(story.articles) ?? story.createdAt;
-  const platformCoverage = getRegionCoverage({ sinceHours: 48 });
+  const platformCoverage = await getRegionCoverage({ sinceHours: 48 });
   const path = `/story/${story.id}`;
 
   return (
