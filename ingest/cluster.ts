@@ -9,6 +9,7 @@
  * single-source clusters stay as loose articles until another outlet reports.
  */
 import { createHash } from "node:crypto";
+import type { LlmRun } from "./llm";
 import type { Db } from "../db/client";
 import { CLUSTERING } from "../lib/thresholds";
 import type { SourceTypeId, StoryStatus } from "../lib/taxonomy";
@@ -148,8 +149,9 @@ export interface ClusterResult {
   windowArticles: WindowArticle[];
 }
 
-export async function cluster(db: Db, now = Date.now()): Promise<ClusterResult> {
+export async function cluster(db: Db, now = Date.now(), llm?: LlmRun): Promise<ClusterResult> {
   const window = await loadWindow(db, now);
+  const existingTopics = new Map((await db.query<{ id: string; topic: string }>(`SELECT id,topic FROM stories`)).map((s) => [s.id, s.topic]));
   const clusters = new Map<string, Cluster>(); // key: storyId or temp id
   const newCluster = (key: string, storyId: string | null): Cluster => {
     const c: Cluster = { storyId, members: [], sum: new Map(), ents: new Set(), u: null, last: 0 };
@@ -177,7 +179,10 @@ export async function cluster(db: Db, now = Date.now()): Promise<ClusterResult> 
       const s = similarity(a, c);
       if (s > bestSim) [best, bestSim] = [c, s];
     }
-    const target = best && bestSim >= CLUSTERING.similarity ? best : newCluster(`tmp-${tmp++}`, null);
+    let sameEvent: boolean | null = null;
+    if (best && Math.abs(cosine(a.vec, unitOf(best)) - CLUSTERING.similarity) <= 0.05)
+      sameEvent = await llm?.sameEvent(a.headline, best.members.slice(0, 5).map((m) => m.headline).join("\n")) ?? null;
+    const target = best && (sameEvent ?? bestSim >= CLUSTERING.similarity) ? best : newCluster(`tmp-${tmp++}`, null);
     join(target, a);
     changed.add(target);
   }
@@ -189,7 +194,12 @@ export async function cluster(db: Db, now = Date.now()): Promise<ClusterResult> 
     for (let j = i + 1; j < list.length; j++) {
       const big = list[i], small = list[j];
       if (!big.members.length || !small.members.length) continue;
-      if (cosine(unitOf(big), unitOf(small)) + ENTITY_BOOST * jaccard(big.ents, small.ents) < MERGE_SIMILARITY) continue;
+      if (Math.abs(big.last - small.last) > CLUSTERING.windowHours * 3600_000) continue;
+      const raw = cosine(unitOf(big), unitOf(small));
+      const heuristic = raw + ENTITY_BOOST * jaccard(big.ents, small.ents) >= MERGE_SIMILARITY;
+      const checked = Math.abs(raw - MERGE_SIMILARITY) <= 0.05
+        ? await llm?.sameEvent(big.members.slice(0, 5).map((m) => m.headline).join("\n"), small.members.slice(0, 5).map((m) => m.headline).join("\n")) ?? null : null;
+      if (!(checked ?? heuristic)) continue;
       for (const m of small.members) join(big, m);
       if (small.storyId && !big.storyId) big.storyId = small.storyId;
       else if (small.storyId) await db.execute(`DELETE FROM stories WHERE id = $1`, [small.storyId]); // articles re-pointed below
@@ -214,7 +224,10 @@ export async function cluster(db: Db, now = Date.now()): Promise<ClusterResult> 
       c.storyId = storyIdFor(title, c.members.map((m) => m.id).sort()[0]);
       created++;
     }
-    const topic = pickTopic(c.members.map((m) => `${m.headline} ${m.excerpt}`));
+    const texts = c.members.map((m) => `${m.headline} ${m.excerpt}`);
+    const topic = changed.has(c)
+      ? (await llm?.topic(texts.join("\n"))) ?? pickTopic(texts)
+      : existingTopics.get(c.storyId) ?? pickTopic(texts);
     const status = statusFor(first, last, times.filter((t) => t >= recentCutoff).length, now);
     await db.execute(`INSERT INTO stories (id,title,summary,status,topic,score,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT(id) DO UPDATE SET status=excluded.status, topic=excluded.topic, score=excluded.score, updated_at=excluded.updated_at`, [c.storyId, title, "", status, topic, scoreFor(c.members, now), new Date(first).toISOString(), new Date(last).toISOString()]);

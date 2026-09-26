@@ -7,9 +7,8 @@ import Parser from "rss-parser";
 import { FEEDS, type FeedSource } from "../config/feeds";
 import { canonicalUrl, makeExcerpt, stripHtml } from "./normalize";
 
-const UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
-const TIMEOUT_MS = 25_000;
+export const FEED_USER_AGENT = "Mozilla/5.0 (compatible; AlunsinaNewsBot/1.0; +https://alunsina.news/methodology)";
+const TIMEOUT_MS = 12_000;
 const MAX_AGE_DAYS = 7;
 
 export interface RawItem {
@@ -39,7 +38,7 @@ type Item = Parser.Item & {
   contentSnippet?: string;
   summary?: string;
 };
-const parser: Parser<object, Item> = new Parser({
+export const feedParser: Parser<object, Item> = new Parser({
   timeout: TIMEOUT_MS,
   customFields: {
     item: [
@@ -84,7 +83,7 @@ export function extractItemImage(item: Item): string | null {
     const url = valid(item.enclosure.url);
     if (url) return url;
   }
-  for (const html of [item["content:encoded"], item.content]) {
+  for (const html of [item["content:encoded"], item.content, item.summary]) {
     const src = html?.match(
       /<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i,
     );
@@ -101,7 +100,7 @@ async function fetchText(url: string): Promise<string> {
     const res = await fetch(url, {
       signal: ctrl.signal,
       headers: {
-        "User-Agent": UA,
+        "User-Agent": FEED_USER_AGENT,
         Accept:
           "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.5",
       },
@@ -126,7 +125,7 @@ async function fetchFeed(
   url: string,
   now: number,
 ): Promise<RawItem[]> {
-  const feed = await parser.parseString(await fetchText(url));
+  const feed = await feedParser.parseString(await fetchText(url));
   const cutoff = now - MAX_AGE_DAYS * 86400_000;
   const out: RawItem[] = [];
   for (const it of feed.items) {
@@ -135,6 +134,7 @@ async function fetchFeed(
     const published = Number.isNaN(ts) ? now : Math.min(ts, now);
     if (published < cutoff) continue;
     const body = stripHtml(it.contentSnippet ?? it.summary ?? it.content ?? "");
+    const imageUrl = extractItemImage(it);
     out.push({
       source,
       headline: cleanHeadline(stripHtml(it.title)),
@@ -142,8 +142,8 @@ async function fetchFeed(
       url: canonicalUrl(it.link),
       excerpt: makeExcerpt(body),
       publishedAt: new Date(published).toISOString(),
-      imageUrl: extractItemImage(it),
-      imageCredit: extractItemImage(it) ? source.name : null,
+      imageUrl,
+      imageCredit: imageUrl ? source.name : null,
     });
   }
   return out;

@@ -57,5 +57,5 @@ export const BLINDSPOT_RULES = {
 export const RELATED_STORIES = {
   maxGapDays: 14,
   minConfidenceShown: 0.6,
-  text: "Two Stories are linked as related when they share named people, places, or institutions and the same topic, and were reported within 14 days of each other, but are different events. Each link gets a confidence score; only links scoring 0.6 or higher are shown.",
+  text: "Related Stories are candidate separate events in an ongoing situation: they must share a named person, place or institution in their titles and the same topic, begin at least 6 hours and no more than 14 days apart, and have moderate text similarity (0.12 to below 0.32), below the coverage grouping threshold. Confidence combines text similarity and shared names; only scores of 0.6 or higher are shown. These automated links can be wrong.",
 } as const;

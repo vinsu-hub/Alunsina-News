@@ -10,8 +10,10 @@ import { detectBlindspots } from "./blindspots";
 import { cluster } from "./cluster";
 import { deriveStory, linkFactChecks } from "./derive";
 import { fetchAll } from "./fetch";
-import { llmPass } from "./llm";
+import { LlmRun, llmPass } from "./llm";
 import { articleId, detectLanguage, tagRegion } from "./normalize";
+
+import { linkRelatedStories, type RelatedResult } from "./related";
 
 const RETAIN_DAYS = 14;
 
@@ -22,6 +24,9 @@ export interface IngestSummary {
   feedErrors: { source: string; url: string; error: string }[];
   articlesSeen: number;
   articlesNew: number;
+  articlesWithImages: number;
+  related: RelatedResult;
+  llmCalls: { haiku: number; sonnet: number };
   factChecksNew: number;
   storiesTouched: number;
   storiesCreated: number;
@@ -81,6 +86,7 @@ export async function runIngest(
   const t0 = Date.now();
   const now = opts.now ?? Date.now();
   const dryRun = Boolean(opts.dryRun);
+  const llm = new LlmRun(opts.llm !== false && !dryRun);
   const fetched = await fetchAll(now);
 
   const rollback = new Error("dry-run rollback");
@@ -137,7 +143,7 @@ export async function runIngest(
         );
       }
 
-      const c = await cluster(db, now);
+      const c = await cluster(db, now, llm);
       touched = [...c.touched];
       await linkFactChecks(db, touched, now);
       let blindspots = 0;
@@ -145,6 +151,8 @@ export async function runIngest(
         await deriveStory(db, id);
         blindspots += await detectBlindspots(db, id, now);
       }
+
+      const related = await linkRelatedStories(db, now);
 
       const cutoff = new Date(now - RETAIN_DAYS * 86400_000).toISOString();
       await db.execute(`DELETE FROM stories WHERE updated_at < $1`, [cutoff]);
@@ -162,12 +170,15 @@ export async function runIngest(
         feedErrors: fetched.errors,
         articlesSeen: fetched.items.length,
         articlesNew,
+        articlesWithImages: fetched.items.filter((i) => !i.source.factCheck && i.imageUrl).length,
+        related,
+        llmCalls: llm.counts,
         factChecksNew,
         storiesTouched: touched.length,
         storiesCreated: c.created,
         storiesMerged: c.merged,
         blindspots,
-        llm: { updated: 0, errors: [] },
+        llm: { updated: 0, errors: llm.errors },
         removedSample,
         durationMs: 0,
       };
@@ -183,7 +194,7 @@ export async function runIngest(
   }
   const summary = result!;
   if (!dryRun) {
-    if (opts.llm !== false) summary.llm = await llmPass(db, touched);
+    if (opts.llm !== false) summary.llm = await llmPass(db, touched, llm);
     await db.execute(
       `UPDATE ingest_runs SET finished_at=$1, articles_seen=$2, articles_new=$3, stories=$4, errors=$5 WHERE id=$6`,
       [
@@ -203,6 +214,7 @@ export async function runIngest(
       ],
     );
   }
+  llm.logCounts();
   summary.durationMs = Date.now() - t0;
   return summary;
 }

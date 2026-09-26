@@ -15,6 +15,8 @@ async function main() {
   feeds ok          ${s.feedsOk} (${s.feedErrors.length} failed)
   items fetched     ${s.articlesSeen}
   new articles      ${s.articlesNew}
+  feed images       ${s.articlesWithImages}
+  related links     ${s.related.links} (confidence >= 0.6)
   new fact-checks   ${s.factChecksNew}
   stories touched   ${s.storiesTouched} (${s.storiesCreated} new, ${s.storiesMerged} merged)
   blindspots        ${s.blindspots}
@@ -23,6 +25,7 @@ async function main() {
   duration          ${(s.durationMs / 1000).toFixed(1)}s`);
   for (const e of s.feedErrors) console.log(`  ! ${e.source}: ${e.error} (${e.url})`);
   for (const e of s.llm.errors) console.log(`  ! llm ${e}`);
+  for (const pair of s.related.examples) console.log(`  related (${pair.confidence.toFixed(2)}): ${pair.earlier} → ${pair.later}`);
   const top = (await db.query(`SELECT st.title, st.topic, st.status, COUNT(DISTINCT a.source_id)::int sources, COUNT(*)::int articles
        FROM stories st JOIN articles a ON a.story_id = st.id GROUP BY st.id ORDER BY st.score DESC LIMIT 12`, [])) as { title: string; topic: string; status: string; sources: number; articles: number }[];
   console.log("\n  Top stories:");

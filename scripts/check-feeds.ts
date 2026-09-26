@@ -1,7 +1,7 @@
 /**
  * Feed health check (`npm run check-feeds`).
  *
- * Fetches every feed in config/feeds.ts (15s timeout, browser-like User-Agent)
+ * Fetches every feed in config/feeds.ts (15s timeout, honestly identifying RSS-reader User-Agent)
  * and reports HTTP status, item count and the latest item date. For feeds that
  * fail or return no items it fetches the publisher homepage and tries to
  * discover a working feed: `<link rel="alternate" type="application/rss+xml">`
@@ -10,25 +10,26 @@
  * Usage:
  *   npm run check-feeds                # check config/feeds.ts
  *   npm run check-feeds -- --probe URL [URL...]   # check arbitrary feed/homepage URLs
+ *   npm run check-feeds -- --images    # image share per source
  *   npm run check-feeds -- --json      # machine-readable output
  *
  * This script only reports; config/feeds.ts is edited by hand from its output
  * (set `verified: true` only for feeds that actually returned items).
  */
-import Parser from "rss-parser";
+import { extractItemImage, feedParser, FEED_USER_AGENT } from "../ingest/fetch";
 import { FEEDS } from "../config/feeds";
 
-export const USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+export const USER_AGENT = FEED_USER_AGENT;
 const TIMEOUT_MS = 15_000;
 
-const parser = new Parser({ timeout: TIMEOUT_MS });
+
 
 interface FeedResult {
   url: string;
   status: number | null;
   items: number;
   latest: string | null;
+  images?: number;
   error?: string;
 }
 
@@ -58,12 +59,12 @@ export async function checkFeed(url: string): Promise<FeedResult> {
     if (status >= 400) return { url, status, items: 0, latest: null, error: `HTTP ${status}` };
     if (!/<(rss|feed|rdf:RDF)[\s>]/i.test(body.slice(0, 5000)))
       return { url, status, items: 0, latest: null, error: "not an RSS/Atom document" };
-    const feed = await parser.parseString(body);
+    const feed = await feedParser.parseString(body);
     const dates = feed.items
       .map((i) => Date.parse(i.isoDate ?? i.pubDate ?? ""))
       .filter((d) => !Number.isNaN(d));
     const latest = dates.length ? new Date(Math.max(...dates)).toISOString() : null;
-    return { url, status, items: feed.items.length, latest };
+    return { url, status, items: feed.items.length, latest, images: feed.items.filter((i) => extractItemImage(i)).length };
   } catch (e) {
     const msg = e instanceof Error ? (e.name === "AbortError" ? "timeout" : e.message) : String(e);
     return { url, status: null, items: 0, latest: null, error: msg.slice(0, 120) };
@@ -118,6 +119,7 @@ async function pool<T, R>(xs: T[], n: number, fn: (x: T) => Promise<R>): Promise
 
 async function main() {
   const args = process.argv.slice(2);
+  const withImages = args.includes("--images");
   const asJson = args.includes("--json");
   const probeIdx = args.indexOf("--probe");
 
@@ -158,6 +160,15 @@ async function main() {
       );
     if (r.feeds.length && !r.ok)
       console.log(`${pad("", 22)} ${r.suggestion ? `→ discovered ${r.suggestion.url} (${r.suggestion.items} items, latest ${r.suggestion.latest})` : "→ no working feed discovered"}`);
+  }
+  if (withImages) {
+    console.log("\nPublisher-provided image coverage (feed items; no article-page scraping):");
+    for (const r of rows) {
+      const checked = r.ok ? r.feeds : r.suggestion ? [r.suggestion] : r.feeds;
+      const total = checked.reduce((n, f) => n + f.items, 0);
+      const images = checked.reduce((n, f) => n + (f.images ?? 0), 0);
+      console.log(`${pad(r.id, 22)} ${images}/${total} (${total ? (100 * images / total).toFixed(1) : "0.0"}%)`);
+    }
   }
   const ok = rows.filter((r) => r.ok).length;
   console.log(`\n${ok}/${rows.length} sources have a working feed.`);

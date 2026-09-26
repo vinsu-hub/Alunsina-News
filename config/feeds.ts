@@ -77,7 +77,8 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en", "fil"],
-    verified: true,
+    verified: false,
+    feedNote: "HTTP 403 with identifying RSS-reader User-Agent on 2026-09-27; no working alternative discovered",
   },
   {
     id: "manila-bulletin",
@@ -160,7 +161,8 @@ export const FEEDS: FeedSource[] = [
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["fil"],
-    verified: true,
+    verified: false,
+    feedNote: "HTTP 403 with identifying RSS-reader User-Agent on 2026-09-27; no working alternative discovered",
   },
 
   // ---- Independent ----
@@ -419,6 +421,34 @@ export const FEEDS: FeedSource[] = [
   },
 
   // ---- Community ----
+  {
+    id: "bombo-radyo",
+    name: "Bombo Radyo",
+    type: "community",
+    homepage: "https://www.bomboradyo.com",
+    feeds: ["https://www.bomboradyo.com/feed/"],
+    ownership: "Ownership not yet verified",
+    ownershipSource: "Ownership verification pending",
+    dataStatus: "feed",
+    regions: [], // Network-wide feed; tag individual places from reporting.
+    languages: ["fil", "en"],
+    verified: true,
+    feedNote: "Radio network feed returned 10 items on 2026-09-27; no image fields",
+  },
+  {
+    id: "brigada-news",
+    name: "Brigada News",
+    type: "community",
+    homepage: "https://www.brigadanews.ph",
+    feeds: ["https://www.brigadanews.ph/feed/"],
+    ownership: "Ownership not yet verified",
+    ownershipSource: "Ownership verification pending",
+    dataStatus: "feed",
+    regions: [], // Network-wide feed, not a single-region newsroom.
+    languages: ["fil", "en"],
+    verified: true,
+    feedNote: "Radio network feed returned 10 items on 2026-09-27; no image fields",
+  },
   {
     id: "nordis",
     name: "Northern Dispatch",
