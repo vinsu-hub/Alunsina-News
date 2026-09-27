@@ -1,4 +1,5 @@
-import "server-only";
+// Server-side module (used by Next route handlers/actions and the CLI ingest). Not marked "server-only"
+// because the CLI ingest (tsx) must import it; never import it from a client component.
 import { getDb, type Db } from "@/db/client";
 export type ScreeningResult = { status: "passed" | "flagged" | "pending"; categories: string[]; screenedAt: string | null };
 /** TODO: confirm Laya's response contract. Expected: { pass: boolean, categories: string[] }.
