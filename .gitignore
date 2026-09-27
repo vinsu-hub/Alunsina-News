@@ -45,3 +45,5 @@ data/
 .playwright-mcp/
 
 /data/pglite*/
+
+!.env.example
