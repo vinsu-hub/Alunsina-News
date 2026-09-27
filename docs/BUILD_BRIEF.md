@@ -73,7 +73,7 @@ Routes/files added, anything you couldn't finish, and any requested change to sh
 
 Configure `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `LAYA_URL`, and `LAYA_TOKEN` from `.env.example`. Do all local commands with **`DATABASE_URL=`**, including dev. Migrations 0004 add identity verification, contributor region/source/active state, pitches/publications, story moderation, flag resolution, and the audit log; their Supabase copy is identical. No approval columns or manual screening overrides exist.
 
-`lib/admin/session.ts` implements SHA-256 digest password comparison and HMAC-SHA256 cookies (`alunsina_admin`, httpOnly, secure, sameSite=lax, 12 hours). `proxy.ts` protects `/admin/**` and `/api/admin/**`; `/admin/login` is public. Every exported admin query/mutation and every action/route re-checks the session. POST `/api/auth/admin/login` accepts a password via JSON or form data: 401 for wrong password, 429 after five attempts per IP in 15 minutes, 503 when the session secret is missing, JSON success or form redirect to `/admin`. The memory limiter trusts the deployment's `x-forwarded-for` header; the hosting edge must supply it. POST `/api/admin/logout` clears the cookie; GET `/api/admin/session` checks it. Configure credentials before starting dev to test login. Secure cookies work on localhost; deployed access must use HTTPS.
+`lib/admin/session.ts` implements SHA-256 digest password comparison and HMAC-SHA256 cookies (`alunsina_admin`, httpOnly, secure, sameSite=lax, 12 hours). `proxy.ts` protects `/admin/**` and `/api/admin/**`; `/admin/login` and `/api/admin/login` are public. Every exported admin query/mutation and every action/route re-checks the session. POST `/api/admin/login` accepts a password via JSON or form data: 401 for wrong password, 429 after five attempts per IP in 15 minutes, 503 when the session secret is missing, JSON success or form redirect to `/admin`. The memory limiter trusts the deployment's `x-forwarded-for` header; the hosting edge must supply it. POST `/api/admin/logout` clears the cookie; GET `/api/admin/session` checks it. Configure credentials before starting dev to test login. Secure cookies work on localhost; deployed access must use HTTPS.
 
 Public queries in `lib/queries/pitches.ts`:
 
@@ -104,3 +104,7 @@ DATABASE_URL= ALUNSINA_PGLITE_DIR=data/pglite-w2a NODE_OPTIONS=--conditions=reac
 ```
 
 The smoke script requires an explicitly empty database URL, exercises real admin session assertions in a Next request-store fixture, and proves public identity/screening gates, held journalist publications, clustering linkage, hidden stories, audits, and screening fallback. It modifies sample screening states; re-seed afterward. `npm run ingest` sets the react-server condition because ingest now imports the server-only screening service.
+
+## Consolidated API routes (Wave 2d)
+
+Seven `route.ts` files serve the API. `app/api/admin/[...action]/route.ts` dispatches POST login/logout/ingest/pitches/<id>/publish and GET session, retaining in-handler session checks for every action except login and `maxDuration = 300`. `app/api/stories/[[...slug]]/route.ts` retains GET `/api/stories` and `/api/stories/area`; unknown paths return 404. Login callers use `/api/admin/login`; the old `/api/auth/admin/login` endpoint is removed. The area, flags, cron ingest, newsletter, and places handlers remain separate.

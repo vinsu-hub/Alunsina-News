@@ -264,13 +264,48 @@ try {
     (await context.request.get(base + "/api/admin/session")).status(),
     401,
   );
+  // Catch-all routing must preserve each endpoint's methods and auth boundary.
+  assert.equal((await context.request.get(base + "/api/stories?ids=metro-manila-lgus-prepare-flooding")).status(), 200);
+  assert.equal((await context.request.get(base + "/api/stories/area?region=r4a&place=San%20Pablo&province=Laguna")).status(), 200);
+  assert.equal((await context.request.get(base + "/api/stories/unknown")).status(), 404);
+  assert.equal((await context.request.post(base + "/api/ingest")).status(), 401);
+  assert.equal((await context.request.post(base + "/api/admin/login/extra")).status(), 401);
+  assert.equal((await context.request.get(base + "/api/admin/login")).status(), 405);
+  assert.equal((await context.request.post(base + "/api/admin/login", {
+    headers: { origin: "https://example.com" },
+    data: { password: env.ADMIN_PASSWORD },
+  })).status(), 403);
+  const jsonLogin = await context.request.post(base + "/api/admin/login", {
+    data: { password: env.ADMIN_PASSWORD },
+  });
+  assert.equal(jsonLogin.status(), 200);
+  assert.deepEqual(await jsonLogin.json(), { ok: true });
+  for (const attribute of [/alunsina_admin=/, /; HttpOnly/i, /; Secure/i, /; SameSite=lax/i]) {
+    assert.match(jsonLogin.headers()["set-cookie"], attribute);
+  }
+  const session = await context.request.get(base + "/api/admin/session");
+  assert.equal(session.status(), 200);
+  assert.deepEqual(await session.json(), { authenticated: true });
+  assert.equal((await context.request.post(base + "/api/admin/session")).status(), 405);
+  assert.equal((await context.request.get(base + "/api/admin/logout")).status(), 405);
+  assert.equal((await context.request.get(base + "/api/admin/ingest")).status(), 405);
+  assert.equal((await context.request.get(base + "/api/admin/pitches/missing/publish")).status(), 405);
+  assert.equal((await context.request.post(base + "/api/admin/pitches/missing/publish", {
+    data: {},
+  })).status(), 400);
+  assert.equal((await context.request.get(base + "/api/admin/unknown")).status(), 404);
+  const options = await context.request.fetch(base + "/api/admin/session", { method: "OPTIONS" });
+  assert.equal(options.status(), 204);
+  assert.equal(options.headers().allow, "GET, HEAD, OPTIONS");
+  assert.equal((await context.request.post(base + "/api/admin/logout")).status(), 200);
+  assert.equal((await context.request.get(base + "/api/admin/session")).status(), 401);
   const limited = await browser.newContext({
     extraHTTPHeaders: { "x-forwarded-for": `w2b-limit-${stamp}` },
   });
   for (let i = 0; i < 5; i++) {
     assert.equal(
       (
-        await limited.request.post(base + "/api/auth/admin/login", {
+        await limited.request.post(base + "/api/admin/login", {
           data: { password: "intentionally-wrong" },
         })
       ).status(),

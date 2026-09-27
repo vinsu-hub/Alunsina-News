@@ -176,7 +176,7 @@ export function LoginForm() {
           setBusy(true);
           setError("");
           try {
-            const res = await fetch("/api/auth/admin/login", {
+            const res = await fetch("/api/admin/login", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ password: data.get("password") }),
