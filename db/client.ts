@@ -1,4 +1,4 @@
-import { PGlite, type Transaction } from "@electric-sql/pglite";
+import type { PGlite, Transaction } from "@electric-sql/pglite";
 import postgres from "postgres";
 import path from "node:path";
 import { mkdir } from "node:fs/promises";
@@ -16,7 +16,7 @@ export interface Db {
 }
 export const DB_PATH = process.env.DATABASE_URL
   ? "DATABASE_URL (Postgres)"
-  : path.resolve(process.env.ALUNSINA_PGLITE_DIR ?? "data/pglite");
+  : path.resolve(/*turbopackIgnore: true*/ process.env.ALUNSINA_PGLITE_DIR ?? "data/pglite");
 
 // Dates use the same ISO-string contract for both drivers and all public mappers.
 function normalize<T>(rows: unknown[]): T[] {
@@ -101,6 +101,8 @@ export function getDb(): Promise<Db> {
         return remote(sql, () => sql.end());
       }
       await mkdir(DB_PATH, { recursive: true });
+      // Loaded only for local dev; production (DATABASE_URL) never bundles PGlite.
+      const { PGlite } = await import("@electric-sql/pglite");
       const engine = new PGlite(DB_PATH);
       await engine.waitReady;
       const db = embedded(engine, () => engine.close());

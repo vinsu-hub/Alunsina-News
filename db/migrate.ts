@@ -9,7 +9,7 @@ export async function applyMigrations(db: Db): Promise<void> {
     await t.exec(
       "CREATE TABLE IF NOT EXISTS schema_migrations (filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
     );
-    const directory = path.join(process.cwd(), "db/migrations");
+    const directory = path.join(/*turbopackIgnore: true*/ process.cwd(), "db/migrations");
     for (const filename of (await readdir(directory))
       .filter((f) => f.endsWith(".sql"))
       .sort()) {
