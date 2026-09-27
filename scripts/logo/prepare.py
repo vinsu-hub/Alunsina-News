@@ -46,6 +46,21 @@ def square(image, size, padding=0, background=(0,0,0,0)):
     canvas.alpha_composite(image, ((size-image.width)//2,(size-image.height)//2))
     return canvas
 
+def prepare_horizontal():
+    """Compose existing approved crops without extracting the source again."""
+    brand = ROOT / "public/brand"
+    emblem = trim(Image.open(brand / "alunsina-emblem@2x.png").convert("RGBA"))
+    wordmark = trim(Image.open(brand / "alunsina-wordmark@2x.png").convert("RGBA"))
+    emblem = emblem.resize((round(emblem.width * 104 / emblem.height), 104), Image.Resampling.LANCZOS)
+    wordmark = resize(wordmark, 400)
+    canvas = Image.new("RGBA", (emblem.width + 14 + wordmark.width, 104))
+    canvas.alpha_composite(emblem, (0, 0))
+    canvas.alpha_composite(wordmark, (emblem.width + 14, (104 - wordmark.height) // 2))
+    canvas.save(brand / "alunsina-logo-horizontal@2x.png")
+    resize(canvas, round(canvas.width / 2)).save(brand / "alunsina-logo-horizontal.png")
+    print("Horizontal:", canvas.size)
+
+
 def main():
     image = remove_background(Image.open(ROOT / "docs/reference/logo-source.png"))
     full = trim(image)
@@ -72,4 +87,9 @@ def main():
     print("Full:", resize(full,480).size, "Wordmark:",resize(wordmark,480).size)
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--horizontal-only" in sys.argv:
+        prepare_horizontal()
+    else:
+        main()
+        prepare_horizontal()

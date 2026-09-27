@@ -10,7 +10,7 @@ const TABS: { href: string; label: string; icon: IconName }[] = [
   { href: "/explore", label: "Explore", icon: "compass" },
   { href: "/my-area", label: "My Area", icon: "pin" },
   { href: "/saved", label: "Saved", icon: "bookmark" },
-  { href: "/settings", label: "Profile", icon: "user" },
+  { href: "/settings", label: "Preferences", icon: "gear" },
 ];
 
 export function MobileTabBar() {

@@ -10,7 +10,7 @@ export async function Footer() {
   ]);
   return (
     <footer className="mx-auto mt-10 max-w-[1440px] border-t border-rule px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-6 md:px-6 md:pb-5">
-      <div className="grid gap-6 sm:grid-cols-3 lg:grid-cols-[1.5fr_.8fr_.8fr_.8fr_1.6fr]">
+      <div className="grid gap-6 sm:grid-cols-3 lg:grid-cols-[1.3fr_.7fr_.7fr_.7fr_.8fr_1.4fr]">
         <div>
           <Link href="/" aria-label="ALUNSINA NEWS — home">
             <Image src="/brand/alunsina-logo-full.png" width={480} height={474} alt="ALUNSINA NEWS" className="h-[110px] w-auto" />
@@ -77,6 +77,7 @@ export async function Footer() {
             ["Photos"],
           ]}
         />
+        <FooterCol title="About" items={[["Methodology", "/methodology"], ["For contributors", "/contribute"], ["Preferences", "/settings"]]} />
         <div className="sm:col-span-2 lg:col-span-1">
           <NewsletterForm />
         </div>

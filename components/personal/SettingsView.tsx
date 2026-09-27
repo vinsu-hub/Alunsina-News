@@ -8,7 +8,7 @@ import { EMPTY_FOLLOWING, useAreas, useFollowing, useLanguages, useSaved, type F
 import { Skeleton } from "./Skeleton";
 
 /**
- * Profile tab target (§24, Phase 05). Section anchors (#language, #notifications)
+ * Preferences tab target (§24, Phase 05). Section anchors (#language, #notifications)
  * are rendered on the server so deep links from the masthead scroll correctly;
  * pref-dependent contents render once storage is readable.
  */
@@ -16,7 +16,7 @@ export function SettingsView() {
   return (
     <div className="mx-auto max-w-[880px] px-4 py-6 md:px-6 md:py-10">
       <Rule double />
-      <h1 className="headline mt-3 text-[32px] font-semibold uppercase leading-none tracking-[0.02em] md:text-5xl">Profile</h1>
+      <h1 className="headline mt-3 text-[32px] font-semibold uppercase leading-none tracking-[0.02em] md:text-5xl">Reader preferences (stored on this device only)</h1>
       <p className="mt-2 font-serif text-[16px] italic text-ink-soft">
         Preferences for this device. There are no accounts yet; nothing here leaves your browser.
       </p>
