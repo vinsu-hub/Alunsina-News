@@ -85,7 +85,7 @@ export async function getPersonalAreaFeed(region: RegionId, place: string, provi
   const terms = placeTerms(place, province);
   const localIds = terms.length
     ? (await all(
-        `SELECT DISTINCT a.story_id id FROM articles a JOIN stories st ON st.id = a.story_id
+        `SELECT DISTINCT a.story_id id FROM public_articles a JOIN public_stories st ON st.id = a.story_id
          WHERE a.region = $1 AND st.updated_at >= $2
            AND (${terms.map((_, i) => `(a.headline ILIKE $${3 + i * 2} OR a.excerpt ILIKE $${4 + i * 2})`).join(" OR ")})`,
         region,

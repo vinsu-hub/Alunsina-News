@@ -81,7 +81,7 @@ async function main() {
     ];
     for (const read of reads) await read();
     assert.equal(await q.getStory("nope"), null);
-    assert.equal((await q.listContributors()).length, 4);
+    assert.equal((await q.listContributors()).length, 6);
     const commentary = await q.getStoryCommentary(storyId);
     assert(
       commentary.every(

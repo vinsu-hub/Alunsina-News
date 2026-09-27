@@ -361,7 +361,7 @@ const hash = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 
 export async function seed() {
   const connection = await getDb();
   return connection.tx(async (db) => {
-    await db.exec(`DELETE FROM ingest_runs; DELETE FROM commentary; DELETE FROM story_links; DELETE FROM contributors WHERE is_sample = true; DELETE FROM fact_checks; DELETE FROM evidence; DELETE FROM timeline_events; DELETE FROM blindspots;
+    await db.exec(`DELETE FROM admin_audit; DELETE FROM pitch_publications; DELETE FROM pitches; DELETE FROM ingest_runs; DELETE FROM commentary; DELETE FROM story_links; DELETE FROM contributors WHERE is_sample = true; DELETE FROM fact_checks; DELETE FROM evidence; DELETE FROM timeline_events; DELETE FROM blindspots;
              DELETE FROM story_angles; DELETE FROM story_emphasis; DELETE FROM articles; DELETE FROM stories;
              DELETE FROM sources;`);
 
@@ -388,6 +388,7 @@ export async function seed() {
         await db.execute(`INSERT INTO evidence (story_id,kind,title,publisher,url,published_at) VALUES ($1,$2,$3,$4,$5,$6)`, [s.id, e.kind, e.title, e.publisher, `https://example.org/evidence/${hash(e.title)}`, e.hoursAgo ? ago(e.hoursAgo) : null]);
     }
     await seedContributors(db);
+    await seedPitches(db);
     return { sources: SOURCES.length, stories: STORIES.length, articles: STORIES.reduce((a, s) => a + s.articles.length, 0) };
   });
 }
@@ -418,4 +419,19 @@ async function seedContributors(db: Db) {
   ];
   for (const [id,story,contributor,title,body] of pieces) await db.execute(`INSERT INTO commentary(id,story_id,contributor_id,title,body,published_at,is_sample) VALUES ($1,$2,$3,$4,$5,$6,true)`, [id,story,contributor,title,body,ago(1)]);
   for (const [story,related,relation,confidence] of [[flood,"san-pablo-lakes-cleanup","developing",0.7],[rice,"inflation-september","earlier",0.85],["inflation-september",rice,"later",0.85],[flood,"deped-class-schedule","developing",0.5]]) await db.execute(`INSERT INTO story_links(story_id,related_story_id,relation,confidence) VALUES ($1,$2,$3,$4)`,[story,related,relation,confidence]);
+}
+
+async function seedPitches(db: Db) {
+  for (const [id,name,region] of [["sample-journalist-cebu","Fictional Cebu Reporter (sample)","r7"],["sample-journalist-zamboanga","Fictional Zamboanga Reporter (sample)","r9"]]) {
+    await db.execute(`INSERT INTO sources(id,name,type,ownership,data_status,homepage,regions,languages,topics) VALUES ($1,$2,'journalist',$3,'link','https://example.org',$4,'["en"]','[]')`,[id,name,`Individually owned by ${name}`,JSON.stringify([region])]);
+    await db.execute(`INSERT INTO contributors(id,name,kind,credentials,bio,portfolio_url,is_sample,verified_at,region,source_id) VALUES ($1,$2,'journalist','Fictional independent journalist — sample portfolio','Sample profile, not a real journalist.','https://example.org',true,now(),$3,$1)`,[id,name,region]);
+  }
+  await db.execute(`UPDATE contributors SET verified_at=now(),source_id=CASE WHEN kind='journalist' THEN id ELSE NULL END WHERE is_sample=true AND id='sample-reporter-lake'`);
+  const blindspot=await db.one<{id:number}>(`SELECT id FROM blindspots WHERE type='geographic' ORDER BY id LIMIT 1`);
+  for (const [id,reporter,topic,region,angle,timeframe,status,screen,age,linked] of [
+    ['sample-pitch-cebu','sample-journalist-cebu','Cebu port congestion cargo delays: knock-on effects for Bohol produce shipping','r7','Following cargo delays and their effect on produce shipments to Bohol.','this week','in_progress','passed',48,null],
+    ['sample-pitch-zamboanga','sample-journalist-zamboanga','Flooding recovery in Zamboanga','r9','Documenting recovery where no independent coverage has been detected yet.','ongoing','pitched','passed',0,blindspot?.id ?? null],
+    ['sample-pitch-pending','sample-journalist-cebu','Sample pitch awaiting automated screening','r7','Sample held content.','this week','pitched','pending',0,null],
+    ['sample-pitch-flagged','sample-journalist-zamboanga','Sample pitch held after safety screening','r9','Sample flagged content.','ongoing','pitched','flagged',0,null],
+  ] as const) await db.execute(`INSERT INTO pitches(pitch_id,reporter_id,topic,region,angle,timeframe,status,screening_status,screening_categories,created_at,updated_at,status_changed_at,linked_blindspot_id,screened_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$10,$11,CASE WHEN $8='pending' THEN NULL ELSE now() END)`,[id,reporter,topic,region,angle,timeframe,status,screen,JSON.stringify(screen==='flagged'?['sample_safety_category']:[]),ago(age),linked]);
 }

@@ -20,8 +20,8 @@ export async function POST(request: Request) {
   attempts.set(ip, entry);
   const db = await getDb();
   const target = input.kind === "related_mismatch"
-    ? await db.one("SELECT related_story_id FROM story_links WHERE story_id = $1 AND related_story_id = $2 AND confidence >= 0.6", [input.storyId, input.targetId])
-    : await db.one("SELECT id FROM articles WHERE story_id = $1 AND id = $2", [input.storyId, input.targetId]);
+    ? await db.one("SELECT related_story_id FROM story_links WHERE story_id = $1 AND related_story_id = $2 AND confidence >= 0.6 AND story_id IN (SELECT id FROM public_stories) AND related_story_id IN (SELECT id FROM public_stories)", [input.storyId, input.targetId])
+    : await db.one("SELECT id FROM public_articles WHERE story_id = $1 AND id = $2", [input.storyId, input.targetId]);
   if (!target) return Response.json({ error: "Target does not belong to this story" }, { status: 400 });
   const flag = await createFlag({ kind: input.kind as FlagInput["kind"], storyId: input.storyId, targetId: input.targetId, note: (input.note as string | undefined) ?? "" });
   return Response.json({ flag }, { status: 201 });

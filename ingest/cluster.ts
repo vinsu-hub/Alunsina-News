@@ -45,7 +45,7 @@ export async function loadWindow(db: Db, now: number, hours: number = CLUSTERING
   const since = new Date(now - hours * 3600_000).toISOString();
   const rows = (await db.query(`SELECT a.id, a.story_id, a.source_id, s.type, a.headline, a.excerpt, a.published_at, a.region, a.language
        FROM articles a JOIN sources s ON s.id = a.source_id
-       WHERE a.published_at >= $1 OR a.story_id IN (SELECT id FROM stories WHERE updated_at >= $2)`, [since, since])) as Record<string, string | null>[];
+       WHERE NOT EXISTS (SELECT 1 FROM pitch_publications p WHERE p.article_id=a.id AND p.screening_status <> 'passed') AND (a.published_at >= $1 OR a.story_id IN (SELECT id FROM stories WHERE updated_at >= $2))`, [since, since])) as Record<string, string | null>[];
   const tfs = rows.map((r) => termFreq(tokenize(r.excerpt ?? ""), 1, termFreq(tokenize(r.headline!), 2)));
   const idf = idfFrom(tfs);
   return rows.map((r, i) => ({
@@ -237,5 +237,6 @@ export async function cluster(db: Db, now = Date.now(), llm?: LlmRun): Promise<C
     }
     if (changed.has(c) || c.members.some((m) => Date.parse(m.publishedAt) >= now - 6 * 3600_000)) touched.add(c.storyId);
   }
+  await db.execute(`UPDATE pitches p SET linked_story_id=a.story_id FROM pitch_publications pp JOIN articles a ON a.id=pp.article_id WHERE pp.pitch_id=p.pitch_id AND a.story_id IS NOT NULL`);
   return { touched, created, merged, windowArticles: window };
 }

@@ -59,7 +59,7 @@ const ARTICLE_SELECT = `
          s.ownership_source s_ownership_source, s.data_status s_data_status, s.paywalled s_paywalled,
          s.homepage s_homepage, s.feed_url s_feed_url, s.regions s_regions, s.languages s_languages,
          s.topics s_topics
-  FROM articles a JOIN sources s ON s.id = a.source_id`;
+  FROM public_articles a JOIN sources s ON s.id = a.source_id`;
 
 function toArticle(r: Row): Article {
   return {
@@ -85,7 +85,7 @@ async function statsFor(storyIds: string[]): Promise<Map<string, StoryStats>> {
   const ph = storyIds.map((_, i) => `$${i + 1}`).join(",");
   const rows = await all(
     `SELECT a.story_id, s.id source_id, s.type, a.region, a.language
-     FROM articles a JOIN sources s ON s.id = a.source_id
+     FROM public_articles a JOIN sources s ON s.id = a.source_id
      WHERE a.story_id IN (${ph})`,
     ...storyIds,
   );
@@ -120,7 +120,7 @@ async function statsFor(storyIds: string[]): Promise<Map<string, StoryStats>> {
 async function leadSources(storyIds: string[]): Promise<Map<string, Source>> {
   if (!storyIds.length) return new Map();
   const rows = await (await db()).query<Row>(`${ARTICLE_SELECT}
-    WHERE a.id IN (SELECT DISTINCT ON (story_id) id FROM articles WHERE story_id = ANY($1::text[])
+    WHERE a.id IN (SELECT DISTINCT ON (story_id) id FROM public_articles WHERE story_id = ANY($1::text[])
       ORDER BY story_id, published_at ASC, id)`, [storyIds]);
   return new Map(rows.map((r) => [r.story_id as string, toSource(r, "s_")]));
 }
@@ -131,7 +131,7 @@ async function toSummaries(rows: Row[]): Promise<StorySummary[]> {
   const images = new Map<string, { url: string; credit: string }>();
   if (ids.length) {
     const rows = await (await db()).query<Row>(`SELECT DISTINCT ON (a.story_id) a.story_id, a.image_url, COALESCE(a.image_credit, s.name) credit
-      FROM articles a JOIN sources s ON s.id = a.source_id
+      FROM public_articles a JOIN sources s ON s.id = a.source_id
       WHERE a.story_id = ANY($1::text[]) AND a.image_url IS NOT NULL
       ORDER BY a.story_id, CASE WHEN s.type IN ('national','regional','independent') THEN 0 ELSE 1 END, a.published_at ASC, a.id`, [ids]);
     for (const image of rows) images.set(image.story_id as string, { url: image.image_url as string, credit: image.credit as string });
@@ -181,11 +181,11 @@ export async function coverageFromRegionCounts(counts: Map<string, number>): Pro
 export async function getRegionCoverage(opts: { storyId?: string; sinceHours?: number } = {}) {
   const rows = opts.storyId
     ? (await all(
-        `SELECT region, COUNT(*)::int n FROM articles WHERE story_id = $1 AND region IS NOT NULL GROUP BY region`,
+        `SELECT region, COUNT(*)::int n FROM public_articles WHERE story_id = $1 AND region IS NOT NULL GROUP BY region`,
         opts.storyId,
       ))
     : (await all(
-        `SELECT region, COUNT(*)::int n FROM articles WHERE region IS NOT NULL AND published_at >= $1 GROUP BY region`,
+        `SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL AND published_at >= $1 GROUP BY region`,
         sinceIso(opts.sinceHours ?? 48),
       ));
   return await coverageFromRegionCounts(new Map(rows.map((r) => [r.region as string, r.n as number])));
@@ -237,14 +237,14 @@ export async function listStories(f: StoryFilter = {}): Promise<StorySummary[]> 
   }
   if (articleConds.length) {
     where.push(
-      `EXISTS (SELECT 1 FROM articles a JOIN sources s ON s.id = a.source_id
+      `EXISTS (SELECT 1 FROM public_articles a JOIN sources s ON s.id = a.source_id
                WHERE a.story_id = st.id AND ${articleConds.join(" AND ")})`,
     );
   }
   const limit = bind(f.limit ?? 30);
   const offset = bind(f.offset ?? 0);
   const rows = await all(
-    `SELECT st.* FROM stories st WHERE ${where.join(" AND ")}
+    `SELECT st.* FROM public_stories st WHERE ${where.join(" AND ")}
      ORDER BY st.score DESC, st.updated_at DESC LIMIT ${limit} OFFSET ${offset}`,
     ...p,
   );
@@ -252,7 +252,7 @@ export async function listStories(f: StoryFilter = {}): Promise<StorySummary[]> 
 }
 
 export async function getStory(id: string): Promise<StoryDetail | null> {
-  const r = await one(`SELECT * FROM stories WHERE id = $1`, id);
+  const r = await one(`SELECT * FROM public_stories WHERE id = $1`, id);
   if (!r) return null;
   const [summary] = await toSummaries([r]);
   const articles = (await all(`${ARTICLE_SELECT} WHERE a.story_id = $1 ORDER BY a.published_at DESC`, id)).map(
@@ -267,7 +267,7 @@ export async function getStory(id: string): Promise<StoryDetail | null> {
     id,
   )).map((a) => ({ angle: a.angle as string, share: a.share as number, note: (a.note as string) ?? null }));
   const blindspots = (await all(
-    `SELECT b.*, st.title story_title FROM blindspots b JOIN stories st ON st.id = b.story_id
+    `SELECT b.*, st.title story_title FROM blindspots b JOIN public_stories st ON st.id = b.story_id
      WHERE b.story_id = $1 ORDER BY b.detected_at DESC`,
     id,
   )).map(toBlindspot);
@@ -333,7 +333,7 @@ export async function listBlindspots(opts: { type?: BlindspotTypeId; limit?: num
   }
   p.push(opts.limit ?? 50);
   return (await all(
-    `SELECT b.*, st.title story_title FROM blindspots b JOIN stories st ON st.id = b.story_id
+    `SELECT b.*, st.title story_title FROM blindspots b JOIN public_stories st ON st.id = b.story_id
      WHERE ${where} ORDER BY st.score DESC, b.detected_at DESC LIMIT $${p.length}`,
     ...p,
   )).map(toBlindspot);
@@ -350,12 +350,12 @@ export async function currentBlindspotsByType(): Promise<Blindspot[]> {
 export async function listSources(opts: { type?: SourceTypeId } = {}): Promise<(Source & { articleCount: number })[]> {
   const rows = opts.type
     ? (await all(
-        `SELECT s.*, (SELECT COUNT(*)::int FROM articles a WHERE a.source_id = s.id) n
+        `SELECT s.*, (SELECT COUNT(*)::int FROM public_articles a WHERE a.source_id = s.id) n
          FROM sources s WHERE s.active = 1 AND s.type = $1 ORDER BY s.name`,
         opts.type,
       ))
     : (await all(
-        `SELECT s.*, (SELECT COUNT(*)::int FROM articles a WHERE a.source_id = s.id) n
+        `SELECT s.*, (SELECT COUNT(*)::int FROM public_articles a WHERE a.source_id = s.id) n
          FROM sources s WHERE s.active = 1 ORDER BY s.name`,
       ));
   return rows.map((r) => ({ ...toSource(r), articleCount: r.n as number }));
@@ -370,11 +370,11 @@ export async function getSource(id: string): Promise<SourceProfile | null> {
     id,
   )).map(toArticle);
   const counts = (await one(
-    `SELECT COUNT(*)::int n, COUNT(DISTINCT story_id)::int st FROM articles WHERE source_id = $1`,
+    `SELECT COUNT(*)::int n, COUNT(DISTINCT story_id)::int st FROM public_articles WHERE source_id = $1`,
     id,
   ))!;
   const regionRows = await all(
-    `SELECT region, COUNT(*)::int n FROM articles WHERE source_id = $1 AND region IS NOT NULL GROUP BY region`,
+    `SELECT region, COUNT(*)::int n FROM public_articles WHERE source_id = $1 AND region IS NOT NULL GROUP BY region`,
     id,
   );
   const total = regionRows.reduce((a, x) => a + (x.n as number), 0) || 1;
@@ -401,9 +401,9 @@ export async function search(q: string, limit = 25): Promise<StorySummary[]> {
   const term = `%${q.trim().toLowerCase()}%`;
   if (term === "%%") return [];
   const rows = await all(
-    `SELECT st.* FROM stories st
+    `SELECT st.* FROM public_stories st
      WHERE lower(st.title) ILIKE $1 OR lower(st.summary) ILIKE $2 OR lower(st.topic) ILIKE $3
-        OR EXISTS (SELECT 1 FROM articles a WHERE a.story_id = st.id
+        OR EXISTS (SELECT 1 FROM public_articles a WHERE a.story_id = st.id
                    AND (lower(a.headline) ILIKE $4 OR lower(a.excerpt) ILIKE $5))
      ORDER BY st.updated_at DESC LIMIT $6`,
     term,
@@ -420,22 +420,22 @@ export async function search(q: string, limit = 25): Promise<StorySummary[]> {
 
 export async function getTrendingTopics(sinceHours = 72) {
   const rows = await all(
-    `SELECT st.topic, COUNT(*)::int n FROM stories st WHERE st.updated_at >= $1
+    `SELECT st.topic, COUNT(*)::int n FROM public_stories st WHERE st.updated_at >= $1
      GROUP BY st.topic ORDER BY n DESC LIMIT 12`,
     sinceIso(sinceHours),
   );
   const list = rows.length
     ? rows
-    : (await all(`SELECT topic, COUNT(*)::int n FROM stories GROUP BY topic ORDER BY n DESC LIMIT 12`));
+    : (await all(`SELECT topic, COUNT(*)::int n FROM public_stories GROUP BY topic ORDER BY n DESC LIMIT 12`));
   return list.map((r) => ({ topic: r.topic as string, stories: r.n as number }));
 }
 
 export async function getPlatformStats() {
   const since = sinceIso(24);
   return {
-    articlesToday: ((await one(`SELECT COUNT(*)::int n FROM articles WHERE published_at >= $1`, since))!.n as number) ?? 0,
+    articlesToday: ((await one(`SELECT COUNT(*)::int n FROM public_articles WHERE published_at >= $1`, since))!.n as number) ?? 0,
     sources: (await one(`SELECT COUNT(*)::int n FROM sources WHERE active = 1`))!.n as number,
-    stories: (await one(`SELECT COUNT(*)::int n FROM stories WHERE updated_at >= $1`, since))!.n as number,
+    stories: (await one(`SELECT COUNT(*)::int n FROM public_stories WHERE updated_at >= $1`, since))!.n as number,
   };
 }
 
@@ -494,7 +494,7 @@ export async function listContributors(opts: { kind?: Contributor["kind"]; field
   return (await all(`SELECT * FROM contributors WHERE ($1::text IS NULL OR kind = $1) AND ($2::text IS NULL OR field = $2) ORDER BY name`, opts.kind ?? null, opts.field ?? null)).map(toContributor);
 }
 async function commentaryWhere(column: "story_id" | "contributor_id", id: string): Promise<Commentary[]> {
-  const rows = await all(`SELECT * FROM commentary WHERE ${column} = $1 ORDER BY published_at DESC, id`, id);
+  const rows = await all(`SELECT * FROM commentary WHERE story_id IN (SELECT id FROM public_stories) AND ${column} = $1 ORDER BY published_at DESC, id`, id);
   const contributors = new Map((await listContributors()).map((c) => [c.id, c]));
   return rows.map((r) => ({
     id: r.id as string, storyId: r.story_id as string, contributorId: r.contributor_id as string,
@@ -508,7 +508,7 @@ export async function getContributor(id: string): Promise<ContributorProfile | n
 }
 export async function getStoryCommentary(storyId: string): Promise<Commentary[]> { return commentaryWhere("story_id", storyId); }
 export async function getRelatedStories(storyId: string): Promise<RelatedStory[]> {
-  const rows = await all(`SELECT st.*, sl.relation, sl.confidence FROM story_links sl JOIN stories st ON st.id = sl.related_story_id
+  const rows = await all(`SELECT st.*, sl.relation, sl.confidence FROM story_links sl JOIN public_stories st ON st.id = sl.related_story_id
     WHERE sl.story_id = $1 AND sl.confidence >= 0.6 ORDER BY st.updated_at DESC, st.id`, storyId);
   const summaries = await toSummaries(rows);
   return summaries.map((story, i) => ({ ...story, relation: rows[i].relation as RelatedStory["relation"], confidence: rows[i].confidence as number }));
@@ -522,12 +522,12 @@ export async function getMagnifiedNews(island: "luzon" | "visayas" | "mindanao",
     COUNT(DISTINCT a.source_id) FILTER (WHERE s.type IN ('independent','regional','community','journalist'))::int independent_sources,
     COUNT(DISTINCT a.region)::int localities,
     bool_or(a.region <> 'ncr') non_ncr,
-    (SELECT sx.name FROM articles ax JOIN sources sx ON sx.id = ax.source_id
+    (SELECT sx.name FROM public_articles ax JOIN sources sx ON sx.id = ax.source_id
      WHERE ax.story_id = st.id AND ax.region = ANY($1::text[]) AND sx.type <> 'social'
      ORDER BY CASE WHEN sx.type IN ('independent','regional','community','journalist') THEN 0 ELSE 1 END, ax.published_at ASC, ax.id LIMIT 1) byline
-    FROM stories st JOIN articles a ON a.story_id = st.id JOIN sources s ON s.id = a.source_id
+    FROM public_stories st JOIN public_articles a ON a.story_id = st.id JOIN sources s ON s.id = a.source_id
     WHERE a.region = ANY($1::text[]) AND st.updated_at >= now() - interval '72 hours' AND s.type <> 'social'
-    GROUP BY st.id HAVING COUNT(DISTINCT a.source_id) FILTER (WHERE s.type IN ('independent','regional','community','journalist')) > 0
+    GROUP BY st.id, st.title, st.summary, st.status, st.topic, st.score, st.created_at, st.updated_at, st.hidden HAVING COUNT(DISTINCT a.source_id) FILTER (WHERE s.type IN ('independent','regional','community','journalist')) > 0
     ORDER BY (COUNT(DISTINCT a.source_id) FILTER (WHERE s.type IN ('independent','regional','community','journalist')) * 3
       + COUNT(DISTINCT a.region) + GREATEST(0, 1 - EXTRACT(EPOCH FROM (now() - st.updated_at)) / 259200)) DESC,
       st.updated_at DESC, st.id`, [regionIds]);

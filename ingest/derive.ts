@@ -28,7 +28,7 @@ export interface MemberRow {
 export async function loadMembers(db: Db, storyId: string): Promise<MemberRow[]> {
   return (
     (await db.query(`SELECT a.id, a.source_id, s.name, s.type, s.regions, a.headline, a.excerpt, a.url, a.published_at, a.region, a.language
-         FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.story_id = $1 ORDER BY a.published_at ASC`, [storyId])) as Record<string, string | null>[]
+         FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.story_id = $1 AND NOT EXISTS (SELECT 1 FROM pitch_publications pp WHERE pp.article_id=a.id AND pp.screening_status <> 'passed') ORDER BY a.published_at ASC`, [storyId])) as Record<string, string | null>[]
   ).map((r) => ({
     id: r.id!,
     sourceId: r.source_id!,

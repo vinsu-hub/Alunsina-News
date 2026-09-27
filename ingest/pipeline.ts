@@ -4,6 +4,7 @@
  * optional LLM pass → prune old data. Records an `ingest_runs` row.
  * The first live run removes the fictional sample edition.
  */
+import { rescreenPending } from "../lib/prescreen";
 import type { Db } from "../db/client";
 import { FEEDS } from "../config/feeds";
 import { detectBlindspots } from "./blindspots";
@@ -44,7 +45,7 @@ async function removeSample(db: Db): Promise<boolean> {
   );
   if (!has) return false;
   await db.exec(`DELETE FROM stories WHERE id IN (SELECT DISTINCT story_id FROM articles WHERE source_id LIKE 'sample-%' AND story_id IS NOT NULL);
-           DELETE FROM articles WHERE source_id LIKE 'sample-%';
+           DELETE FROM contributors WHERE is_sample = true; DELETE FROM articles WHERE source_id LIKE 'sample-%';
            DELETE FROM sources WHERE id LIKE 'sample-%'; DELETE FROM contributors WHERE is_sample = true;`);
   return true;
 }
@@ -214,6 +215,7 @@ export async function runIngest(
       ],
     );
   }
+  if (!dryRun) { try { await rescreenPending(50, db); } catch (error) { console.error("Non-fatal pending screen failure", error); } }
   llm.logCounts();
   summary.durationMs = Date.now() - t0;
   return summary;
