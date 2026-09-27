@@ -18,3 +18,16 @@ export async function updateStory(...args: Parameters<typeof admin.updateStory>)
 export async function deleteNewsletterSignup(...args: Parameters<typeof admin.deleteNewsletterSignup>) { await assertAdminSession(); return admin.deleteNewsletterSignup(...args); }
 export async function exportNewsletterCsv(...args: Parameters<typeof admin.exportNewsletterCsv>) { await assertAdminSession(); return admin.exportNewsletterCsv(...args); }
 export async function triggerIngest(...args: Parameters<typeof admin.triggerIngest>) { await assertAdminSession(); return admin.triggerIngest(...args); }
+
+export async function rescreenPending() {
+  await assertAdminSession();
+  const { getDb } = await import("@/db/client");
+  const { rescreenPending: retry } = await import("@/lib/prescreen");
+  await (
+    await getDb()
+  ).execute(
+    "INSERT INTO admin_audit(action,entity,detail) VALUES ('rescreen_pending','pitch',$1)",
+    [JSON.stringify({ limit: 50 })],
+  );
+  return retry(50);
+}

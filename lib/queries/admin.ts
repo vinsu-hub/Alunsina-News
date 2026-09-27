@@ -22,7 +22,7 @@ async function required(db: Db, table: string, column: string, id: string): Prom
 const bounded = (n=50) => Math.max(1,Math.min(200,Math.floor(n)));
 export async function getDashboardStats() {
   await assertAdminSession(); const db=await getDb();
-  return { counts: await db.one(`SELECT (SELECT COUNT(*)::int FROM contributors) contributors,(SELECT COUNT(*)::int FROM pitches) pitches,(SELECT COUNT(*)::int FROM stories) stories,(SELECT COUNT(*)::int FROM sources) sources,(SELECT COUNT(*)::int FROM newsletter_signups) newsletter`),
+  return { counts: await db.one(`SELECT (SELECT COUNT(*)::int FROM articles WHERE published_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'Asia/Manila') articles_today,(SELECT COUNT(*)::int FROM contributors) contributors,(SELECT COUNT(*)::int FROM pitches) pitches,(SELECT COUNT(*)::int FROM pitches WHERE status='pitched') pitched,(SELECT COUNT(*)::int FROM pitches WHERE status='in_progress') in_progress,(SELECT COUNT(*)::int FROM pitches WHERE status='published') published,(SELECT COUNT(*)::int FROM stories) stories,(SELECT COUNT(*)::int FROM sources) sources,(SELECT COUNT(*)::int FROM newsletter_signups) newsletter`),
     ingestRuns: await db.query(`SELECT * FROM ingest_runs ORDER BY id DESC LIMIT 10`),
     pendingScreens: await db.one(`SELECT (SELECT COUNT(*)::int FROM pitches WHERE screening_status='pending') pitches,(SELECT COUNT(*)::int FROM pitch_publications WHERE screening_status='pending') publications`),
     openFlags: Number((await db.one<{ n: number }>(`SELECT COUNT(*)::int n FROM flags WHERE status='open'`))!.n) };
