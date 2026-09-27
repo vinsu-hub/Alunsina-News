@@ -24,6 +24,7 @@ const TOC = [
   ["linking", "We link out"],
   ["related-stories", "Related Stories"],
   ["contributors", "Contributors"],
+  ["pitch-board", "Pitch Board"],
   ["magnified", "Magnified News"],
   ["principles", "Editorial principles"],
 ] as const;
@@ -264,11 +265,19 @@ export default function MethodologyPage() {
             <p>Contributor commentary is original content hosted by ALUNSINA NEWS. Its editorial and liability responsibilities differ from linking to a publisher’s reporting; review and correction policies must cover that hosted content.</p>
             <p>All current contributor profiles and commentary are fictional samples. Applications are not processed yet. Handling under RA 10173 (Data Privacy Act), consent, retention, access, and deletion arrangements are to be finalized before collection begins. <Link href="/contribute" className="link-quiet">Application preview →</Link></p>
           </Section>
-          <Section id="magnified" n={9} title="Magnified News: earned regional discovery">
+          <Section id="pitch-board" n={9} title="Pitch Board: reporting without topic approval">
+            <p>Verification is a one-time identity and expertise gate, never per-story approval. Verified journalists can pitch any topic. The site owner records pitches and status changes on the journalist’s behalf; there are no contributor logins or per-story sign-offs.</p>
+            <p>Both pitches and published pieces pass an automated safety pre-screen. It checks only jailbreak and injection patterns, and harassment, threats, doxxing, and targeted-defamation patterns. It never checks topic, viewpoint, or whether an official is named.</p>
+            <p>Items are held until the screen runs and passes. If screening is unavailable, the item stays pending; flagged items remain held. There is no manual pass or override.</p>
+            <p>Links to Potential Blindspots are optional, system-suggested, and informational. They do not assign a story, reserve a topic, or limit what a journalist may investigate.</p>
+            <p>Status is self-reported by the journalist: Pitched, In Progress, or Published. It is not inferred by the system. Published pieces enter the normal Independent Journalist source and story-grouping pipeline and receive no ranking boost, including in Magnified News.</p>
+            <p><Link href="/experts/reporting" className="link-quiet">Visit Reporting in Progress →</Link></p>
+          </Section>
+          <Section id="magnified" n={10} title="Magnified News: earned regional discovery">
             <p><strong>Placement is never purchased.</strong> Sponsored material, if introduced, must be labeled and structurally separate. Every entry has an attributed publisher or journalist byline.</p>
             <p>Qualifying stories include independent, regional, community, or Independent Journalist reporting in the island within 72 hours. Ranking uses three times the number of distinct eligible sources, plus distinct regions, plus freshness (0–1 over 72 hours). Two of five Luzon slots are reserved for stories touching non-NCR regions when qualifying stories exist. Regional reader engagement is not collected yet; global traffic and payments are not ranking inputs.</p>
           </Section>
-          <Section id="principles" n={10} title="Editorial principles">
+          <Section id="principles" n={11} title="Editorial principles">
             <ol className="grid gap-x-8 gap-y-2 font-sans text-[15px] sm:grid-cols-2">
               {PRINCIPLES.map((p, i) => (
                 <li key={p} className="flex gap-3 border-t border-rule pt-2">

@@ -6,6 +6,7 @@ import { ExploreSubNav } from "@/components/explore/ExploreSubNav";
 import { IndexEntry } from "@/components/explore/IndexEntry";
 import { PlaceIndex } from "@/components/explore/PlaceIndex";
 import { BlindspotEntry } from "@/components/explore/BlindspotEntry";
+import { ExpertTabs } from "@/components/pitches/ExpertTabs";
 import { ContributorList } from "@/components/contributors/ContributorList";
 import { listContributors, listBlindspots } from "@/lib/queries";
 import { languageCounts, placeStoryCounts, sourceTypeCounts, topicIndex, trendingSubjects } from "@/lib/queries/explore";
@@ -134,6 +135,7 @@ export default async function ExplorePage() {
 
         <section aria-labelledby="experts">
           <SectionHead id="experts" title="Experts & Commentary" sub="Analysis — Not Reporting. Expert context, separate from Sources; commentary never counts as a source." action={<Link href="/experts" className="link-quiet">Browse by field →</Link>} />
+          <ExpertTabs active="commentary" />
           <ContributorList contributors={contributors.slice(0, 4)} />
         </section>
 
