@@ -22,7 +22,7 @@ export interface RelatedResult {
 export async function linkRelatedStories(db: Db, now = Date.now()): Promise<RelatedResult> {
   const since = new Date(now - RELATED_STORIES.maxGapDays * 86400_000).toISOString();
   const stories = await db.query<Story>(`SELECT id,title,topic,created_at FROM stories WHERE created_at >= $1 AND created_at <= $2 ORDER BY created_at,id`, [since, new Date(now).toISOString()]);
-  const articles = await db.query<{ story_id: string; headline: string; excerpt: string }>(`SELECT a.story_id,a.headline,a.excerpt FROM articles a JOIN stories s ON s.id=a.story_id WHERE s.created_at >= $1 AND s.created_at <= $2 AND NOT EXISTS (SELECT 1 FROM pitch_publications pp WHERE pp.article_id=a.id AND pp.screening_status <> 'passed')`, [since, new Date(now).toISOString()]);
+  const articles = await db.query<{ story_id: string; headline: string; excerpt: string }>(`SELECT a.story_id,a.headline,a.excerpt FROM articles a JOIN stories s ON s.id=a.story_id WHERE s.created_at >= $1 AND s.created_at <= $2 AND a.source_id IN (SELECT id FROM sources WHERE type <> 'social') AND NOT EXISTS (SELECT 1 FROM pitch_publications pp WHERE pp.article_id=a.id AND pp.screening_status <> 'passed')`, [since, new Date(now).toISOString()]);
   const tfs = articles.map((a) => termFreq(tokenize(a.excerpt ?? ""), 1, termFreq(tokenize(a.headline), 2)));
   const idf = idfFrom(tfs);
   const members = new Map<string, Vec[]>();

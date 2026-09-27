@@ -10,6 +10,8 @@ export interface FeedSource {
   type: SourceTypeId;
   homepage: string;
   feeds: string[]; // one or more RSS/Atom URLs; empty = headline + link only
+  collector?: "agent-reach";
+  listingUrls?: string[];
   ownership: string;
   ownershipSource: string;
   dataStatus: DataStatusId;
@@ -31,7 +33,7 @@ export const FEEDS: FeedSource[] = [
     name: "Inquirer.net",
     type: "national",
     homepage: "https://www.inquirer.net",
-    feeds: ["https://newsinfo.inquirer.net/feed"],
+    feeds: ["https://www.inquirer.net/feed/"],
     ownership: "Philippine Daily Inquirer, Inc. (Inquirer Group)",
     ownershipSource: "Publisher's corporate information page",
     dataStatus: "feed",
@@ -45,7 +47,7 @@ export const FEEDS: FeedSource[] = [
     name: "GMA News Online",
     type: "national",
     homepage: "https://www.gmanetwork.com/news/",
-    feeds: ["https://data.gmanetwork.com/gno/rss/news/feed.xml"],
+    feeds: ["https://www.gmanetwork.com/rss"],
     ownership: "GMA Network, Inc.",
     ownershipSource: "GMA Network corporate filings (PSE)",
     dataStatus: "feed",
@@ -68,6 +70,7 @@ export const FEEDS: FeedSource[] = [
   },
   {
     id: "abs-cbn",
+    collector: "agent-reach", listingUrls: ["https://www.abs-cbn.com/news"],
     name: "ABS-CBN News",
     type: "national",
     homepage: "https://www.abs-cbn.com/news",
@@ -82,6 +85,7 @@ export const FEEDS: FeedSource[] = [
   },
   {
     id: "manila-bulletin",
+    collector: "agent-reach", listingUrls: ["https://mb.com.ph"],
     name: "Manila Bulletin",
     type: "national",
     homepage: "https://mb.com.ph",
@@ -207,6 +211,7 @@ export const FEEDS: FeedSource[] = [
   },
   {
     id: "mindanews",
+    collector: "agent-reach", listingUrls: ["https://www.mindanews.com"],
     name: "MindaNews",
     type: "independent",
     homepage: "https://www.mindanews.com",
@@ -341,6 +346,7 @@ export const FEEDS: FeedSource[] = [
   },
   {
     id: "panay-news",
+    collector: "agent-reach", listingUrls: ["https://www.panaynews.net"],
     name: "Panay News",
     type: "regional",
     homepage: "https://www.panaynews.net",
@@ -354,6 +360,7 @@ export const FEEDS: FeedSource[] = [
   },
   {
     id: "daily-guardian",
+    collector: "agent-reach", listingUrls: ["https://dailyguardian.com.ph"],
     name: "Daily Guardian",
     type: "regional",
     homepage: "https://dailyguardian.com.ph",
@@ -420,6 +427,112 @@ export const FEEDS: FeedSource[] = [
     feedNote: "connection failed as of 2026-09-27; candidate for a data partnership",
   },
 
+  {
+    id: "gma-regional-amianan", name: "GMA Regional TV Balitang Amianan", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/", collector: "agent-reach", listingUrls: ["https://www.gmanetwork.com/regionaltv/balitangamianan"],
+    feeds: [], ownership: "GMA Network, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["r1","r2","r3","car"], languages: ["fil","ilo"], verified: false,
+    feedNote: "Only GMA's broad network RSS was returned; no desk-specific feed verified.",
+  },
+  {
+    id: "cebu-daily-news", name: "Cebu Daily News (CDN Digital)", type: "regional", homepage: "https://cebudailynews.inquirer.net",
+    feeds: [], ownership: "Philippine Daily Inquirer, Inc. (Inquirer Group)", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["r7"], languages: ["en","ceb"], verified: false,
+    feedNote: "HTTP 403 on 2026-09-27; use Agent Reach listing collection.",
+  },
+
+  {
+    id: "the-freeman", name: "The Freeman", type: "regional", homepage: "https://www.philstar.com/the-freeman",
+    feeds: ['https://www.philstar.com/rss/the-freeman'], ownership: "Philstar Global Corp. (MediaQuest Holdings group)", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["r7"], languages: ["en"], verified: true,
+    feedNote: "Section RSS returned 10 items.",
+  },
+  {
+    id: "gma-regional-bisdak", name: "GMA Regional TV Balitang Bisdak", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/", collector: "agent-reach", listingUrls: ["https://www.gmanetwork.com/regionaltv/balitangbisdak"],
+    feeds: [], ownership: "GMA Network, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["r7","r8"], languages: ["ceb","fil"], verified: false,
+    feedNote: "Only GMA's broad network RSS was returned; no desk-specific feed verified.",
+  },
+  {
+    id: "news-today-iloilo", name: "The News Today (Iloilo)", type: "regional", homepage: "https://www.thenewstoday.info",
+    feeds: [], ownership: "Ownership not yet verified", ownershipSource: "Ownership verification pending", dataStatus: "feed",
+    regions: ["r6"], languages: ["en"], verified: false,
+    feedNote: "Fetch failed on 2026-09-27; no working feed discovered.", collector: "agent-reach", listingUrls: ["https://www.thenewstoday.info"],
+  },
+  {
+    id: "gma-one-western-visayas", name: "GMA Regional TV One Western Visayas", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/", collector: "agent-reach", listingUrls: ["https://www.gmanetwork.com/regionaltv/onewesternvisayas"],
+    feeds: [], ownership: "GMA Network, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["r6","nir"], languages: ["hil","fil"], verified: false,
+    feedNote: "Only GMA's broad network RSS was returned; no desk-specific feed verified.",
+  },
+  {
+    id: "visayan-daily-star", name: "Visayan Daily Star", type: "regional", homepage: "https://visayandailystar.com",
+    collector: "agent-reach", listingUrls: ["https://visayandailystar.com"],
+    feeds: [], ownership: "Ownership not yet verified", ownershipSource: "Ownership verification pending", dataStatus: "feed",
+    regions: ["nir"], languages: ["en","hil"], verified: false,
+    feedNote: "Feed returned 10 items, but latest dated 2026-06-06 (outside 7-day ingestion window).",
+  },
+  {
+    id: "bohol-chronicle",
+    collector: "agent-reach", listingUrls: ["https://www.boholchronicle.com.ph"], name: "The Bohol Chronicle", type: "regional", homepage: "https://www.boholchronicle.com.ph",
+    feeds: [], ownership: "Ownership not yet verified", ownershipSource: "Ownership verification pending", dataStatus: "feed",
+    regions: ["r7"], languages: ["en","ceb"], verified: false,
+    feedNote: "Homepage reachable but no feed discovered; /feed/ returned 404.",
+  },
+  {
+    id: "gma-one-mindanao", name: "GMA Regional TV One Mindanao", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/", collector: "agent-reach", listingUrls: ["https://www.gmanetwork.com/regionaltv/onemindanao"],
+    feeds: [], ownership: "GMA Network, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["r11","r10","r12","r9","r13"], languages: ["fil"], verified: false,
+    feedNote: "Only GMA's broad network RSS was returned; no desk-specific feed verified.",
+  },
+  {
+    id: "mindanao-gold-star-daily", name: "Mindanao Gold Star Daily", type: "regional", homepage: "https://mindanaogoldstardaily.com",
+    feeds: ['https://mindanaogoldstardaily.com/rss.xml'], ownership: "Ownership not yet verified", ownershipSource: "Ownership verification pending", dataStatus: "feed",
+    regions: ["r10"], languages: ["en"], verified: true,
+    feedNote: "Feed returned 30 items; latest dated 2026-09-25.",
+  },
+  {
+    id: "davao-today", name: "Davao Today", type: "regional", homepage: "https://davaotoday.com",
+    feeds: ['https://davaotoday.com/feed/'], ownership: "Davao Today, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["r11"], languages: ["en","fil"], verified: true,
+    feedNote: "Feed returned 5 items.",
+  },
+  {
+    id: "business-week-mindanao", name: "Business Week Mindanao", type: "regional", homepage: "https://businessweekmindanao.com",
+    feeds: ['https://businessweekmindanao.com/feed/'], ownership: "Ownership not yet verified", ownershipSource: "Ownership verification pending", dataStatus: "feed",
+    regions: ["r10","r11"], languages: ["en"], verified: true,
+    feedNote: "Feed returned 10 items.",
+  },
+  {
+    id: "kagay-an", name: "Kagay-an.com", type: "regional", homepage: "https://www.kagay-an.com", collector: "agent-reach", listingUrls: ["https://www.kagay-an.com"],
+    feeds: [], ownership: "Ownership not yet verified", ownershipSource: "Ownership verification pending", dataStatus: "feed",
+    regions: ["r10"], languages: ["en"], verified: false,
+    feedNote: "RSS endpoint intermittently unavailable on 2026-09-27; collector fallback enabled.",
+  },
+  {
+    id: "cagayan-de-oro-times",
+     name: "Cagayan de Oro Times", type: "regional", homepage: "https://cagayandeorotimes.com/",
+    feeds: ["https://cagayandeorotimes.com/feed/"], ownership: "Ownership not yet verified", ownershipSource: "Ownership verification pending", dataStatus: "feed",
+    regions: ["r10"], languages: ["en"], verified: true,
+    feedNote: "Feed discovered on 2026-09-27; latest item dated 2026-09-22.",
+  },
+  {
+    id: "mindanao-daily-news", name: "Mindanao Daily News", type: "regional", homepage: "https://mindanaodailynews.com",
+    feeds: ['https://mindanaodailynews.com/feed/'], ownership: "Ownership not yet verified", ownershipSource: "Ownership verification pending", dataStatus: "feed",
+    regions: ["r10","r11","r12","r13"], languages: ["en"], verified: true,
+    feedNote: "Feed returned 10 items.",
+  },
+  {
+    id: "daily-tribune", name: "Daily Tribune", type: "national", homepage: "https://tribune.net.ph",
+    feeds: ['https://tribune.net.ph/rss.xml'], ownership: "The Tribune Media Group, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["ncr"], languages: ["en"], verified: true,
+    feedNote: "RSS discovery returned 40 items.",
+  },
+  {
+    id: "one-news", name: "TV5 / One News / One PH", type: "national", homepage: "https://www.onenews.ph",
+    feeds: [], ownership: "MediaQuest Holdings, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
+    regions: ["ncr"], languages: ["en","fil"], verified: false,
+    feedNote: "No working RSS feed discovered; One PH has no verified separate listing.", collector: "agent-reach", listingUrls: ["https://www.onenews.ph"],
+  },
   // ---- Community ----
   {
     id: "bombo-radyo",

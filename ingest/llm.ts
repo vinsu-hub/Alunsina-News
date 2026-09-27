@@ -123,7 +123,7 @@ export async function llmPass(db: Db, storyIds: string[], run = new LlmRun()): P
   const top = (await db.query<{ id: string }>(`SELECT id FROM stories WHERE id IN (${storyIds.map((_, i) => `$${i + 1}`).join(",")}) ORDER BY score DESC LIMIT $${storyIds.length + 1}`, [...storyIds, MAX_STORIES])).map((r) => r.id);
   let updated = 0;
   for (const id of top) {
-    const ms = await loadMembers(db, id);
+    const ms = (await loadMembers(db, id)).filter((m) => m.sourceType !== "social");
     const byType = new Map<SourceTypeId, string[]>();
     for (const m of ms.slice(-40)) {
       const lines = byType.get(m.sourceType) ?? [];

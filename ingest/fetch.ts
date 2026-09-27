@@ -7,7 +7,7 @@ import Parser from "rss-parser";
 import { FEEDS, type FeedSource } from "../config/feeds";
 import { canonicalUrl, makeExcerpt, stripHtml } from "./normalize";
 
-export const FEED_USER_AGENT = "Mozilla/5.0 (compatible; AlunsinaNewsBot/1.0; +https://alunsina.news/methodology)";
+export const FEED_USER_AGENT = "AlunsinaNewsBot/1.0 (+https://alunsina.news/methodology)";
 const TIMEOUT_MS = 12_000;
 const MAX_AGE_DAYS = 7;
 

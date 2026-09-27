@@ -11,6 +11,10 @@ import { detectBlindspots } from "./blindspots";
 import { cluster } from "./cluster";
 import { deriveStory, linkFactChecks } from "./derive";
 import { fetchAll } from "./fetch";
+import { archiveExternal, readExternal } from "./external";
+import { fetchReddit } from "./social/reddit";
+import { fetchX } from "./social/x";
+import { attachSocial } from "./social/attach";
 import { LlmRun, llmPass } from "./llm";
 import { articleId, detectLanguage, tagRegion } from "./normalize";
 
@@ -26,6 +30,8 @@ export interface IngestSummary {
   articlesSeen: number;
   articlesNew: number;
   articlesWithImages: number;
+  external: { accepted: number; rejected: number; files: number; fileErrors: string[]; inserted: number };
+  social: { reddit: number; x: number; attached: number; unmatched: number; errors: string[] };
   related: RelatedResult;
   llmCalls: { haiku: number; sonnet: number };
   factChecksNew: number;
@@ -52,8 +58,8 @@ async function removeSample(db: Db): Promise<boolean> {
 
 async function upsertSources(db: Db) {
   for (const f of FEEDS) {
-    // Sources without a working feed stay out of the index until a feed or partnership exists.
-    const active = f.verified && f.feeds.length > 0 && !f.factCheck ? 1 : 0;
+    // Public-listing collectors are active headline+link sources; unresolved feed sources stay inactive.
+    const active = !f.factCheck && ((f.verified && f.feeds.length > 0) || f.collector === "agent-reach") ? 1 : 0;
     await db.execute(
       `INSERT INTO sources (id,name,type,ownership,ownership_source,data_status,paywalled,homepage,feed_url,regions,languages,topics,active)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
@@ -67,7 +73,7 @@ async function upsertSources(db: Db) {
         f.type,
         f.ownership,
         f.ownershipSource,
-        f.dataStatus,
+        f.collector === "agent-reach" && !f.feeds.length ? "link" : f.dataStatus,
         f.paywalled ? 1 : 0,
         f.homepage,
         f.feeds[0] ?? null,
@@ -89,6 +95,14 @@ export async function runIngest(
   const dryRun = Boolean(opts.dryRun);
   const llm = new LlmRun(opts.llm !== false && !dryRun);
   const fetched = await fetchAll(now);
+  const external = await readExternal(now);
+  fetched.items.push(...external.items);
+  const topicRows = await db.query<{ title: string }>(`SELECT title FROM stories WHERE updated_at >= $1 ORDER BY score DESC LIMIT 10`, [new Date(now - 48 * 3600_000).toISOString()]);
+  const topics = [...topicRows.map((r) => r.title), ...fetched.items.slice(0, 10).map((r) => r.headline)];
+  const [reddit, x] = await Promise.all([fetchReddit(topics, now), fetchX(topics, now)]);
+  const socialItems = [...reddit.items, ...x.items];
+  const socialSummary = { reddit: reddit.items.length, x: x.items.length, attached: 0, unmatched: 0, errors: [...reddit.errors, ...x.errors] };
+  let externalAttached = 0;
 
   const rollback = new Error("dry-run rollback");
   let result: IngestSummary | undefined;
@@ -120,7 +134,7 @@ export async function runIngest(
         const text = `${it.headline}. ${it.excerpt}`;
         const lang = detectLanguage(text, it.source.languages);
         const region = tagRegion(it.headline, it.excerpt, it.source);
-        articlesNew += Number(
+        const inserted = Number(
           (
             await db.execute(
               `INSERT INTO articles (id,source_id,story_id,headline,byline,url,excerpt,published_at,language,region,fetched_at,image_url,image_credit)
@@ -142,10 +156,17 @@ export async function runIngest(
             )
           ).changes,
         );
+        articlesNew += inserted;
+        if (external.items.includes(it)) { externalAttached += inserted; }
       }
 
       const c = await cluster(db, now, llm);
       touched = [...c.touched];
+      const linkedSocial = await attachSocial(db, socialItems, now);
+      socialSummary.attached = linkedSocial.attached;
+      socialSummary.unmatched = linkedSocial.unmatched;
+      const socialStories = await db.query<{ story_id: string }>(`SELECT DISTINCT story_id FROM articles WHERE source_id IN ('social-reddit','social-x') AND published_at >= $1 AND story_id IS NOT NULL`, [new Date(now - 86400_000).toISOString()]);
+      touched = [...new Set([...touched, ...socialStories.map((r) => r.story_id)])];
       await linkFactChecks(db, touched, now);
       let blindspots = 0;
       for (const id of touched) {
@@ -172,6 +193,8 @@ export async function runIngest(
         articlesSeen: fetched.items.length,
         articlesNew,
         articlesWithImages: fetched.items.filter((i) => !i.source.factCheck && i.imageUrl).length,
+        external: { accepted: external.items.length, rejected: external.rejected, files: external.files.length, fileErrors: external.errors, inserted: externalAttached },
+        social: socialSummary,
         related,
         llmCalls: llm.counts,
         factChecksNew,
@@ -195,6 +218,7 @@ export async function runIngest(
   }
   const summary = result!;
   if (!dryRun) {
+    await archiveExternal(external, now);
     if (opts.llm !== false) summary.llm = await llmPass(db, touched, llm);
     await db.execute(
       `UPDATE ingest_runs SET finished_at=$1, articles_seen=$2, articles_new=$3, stories=$4, errors=$5 WHERE id=$6`,
@@ -205,6 +229,8 @@ export async function runIngest(
         touched.length,
         JSON.stringify([
           ...fetched.errors,
+          ...external.errors.map((error) => ({ source: "external", url: "", error })),
+          ...socialSummary.errors.map((error) => ({ source: "social", url: "", error })),
           ...summary.llm.errors.map((error) => ({
             source: "llm",
             url: "",

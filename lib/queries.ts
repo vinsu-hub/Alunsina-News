@@ -9,6 +9,7 @@ import {
   type RegionId,
   type SourceTypeId,
 } from "./taxonomy";
+import { summarizeStoryStats } from "./queries/story-stats";
 import type {
   Angle,
   Article,
@@ -86,42 +87,17 @@ async function statsFor(storyIds: string[]): Promise<Map<string, StoryStats>> {
   const rows = await all(
     `SELECT a.story_id, s.id source_id, s.type, a.region, a.language
      FROM public_articles a JOIN sources s ON s.id = a.source_id
-     WHERE a.story_id IN (${ph})`,
+     WHERE a.story_id IN (${ph}) AND s.type <> 'social'`,
     ...storyIds,
   );
-  const acc = new Map<
-    string,
-    { n: number; src: Map<string, string>; reg: Set<string>; lang: Set<string> }
-  >();
-  for (const r of rows) {
-    const id = r.story_id as string;
-    if (!acc.has(id)) acc.set(id, { n: 0, src: new Map(), reg: new Set(), lang: new Set() });
-    const a = acc.get(id)!;
-    a.n++;
-    a.src.set(r.source_id as string, r.type as string);
-    if (r.region) a.reg.add(r.region as string);
-    a.lang.add(r.language as string);
-  }
-  for (const id of storyIds) {
-    const a = acc.get(id);
-    const byType: StoryStats["byType"] = {};
-    a?.src.forEach((t) => (byType[t as SourceTypeId] = (byType[t as SourceTypeId] ?? 0) + 1));
-    out.set(id, {
-      sources: a?.src.size ?? 0,
-      articles: a?.n ?? 0,
-      regions: a?.reg.size ?? 0,
-      languages: a?.lang.size ?? 0,
-      byType,
-    });
-  }
-  return out;
+  return summarizeStoryStats(rows as { story_id: string; source_id: string; type: string; region: string | null; language: string }[], storyIds);
 }
 
 async function leadSources(storyIds: string[]): Promise<Map<string, Source>> {
   if (!storyIds.length) return new Map();
   const rows = await (await db()).query<Row>(`${ARTICLE_SELECT}
-    WHERE a.id IN (SELECT DISTINCT ON (story_id) id FROM public_articles WHERE story_id = ANY($1::text[])
-      ORDER BY story_id, published_at ASC, id)`, [storyIds]);
+    WHERE a.id IN (SELECT DISTINCT ON (a.story_id) a.id FROM public_articles a JOIN sources sx ON sx.id=a.source_id WHERE a.story_id = ANY($1::text[]) AND sx.type <> 'social'
+      ORDER BY a.story_id, story_id, published_at ASC, id)`, [storyIds]);
   return new Map(rows.map((r) => [r.story_id as string, toSource(r, "s_")]));
 }
 
@@ -132,7 +108,7 @@ async function toSummaries(rows: Row[]): Promise<StorySummary[]> {
   if (ids.length) {
     const rows = await (await db()).query<Row>(`SELECT DISTINCT ON (a.story_id) a.story_id, a.image_url, COALESCE(a.image_credit, s.name) credit
       FROM public_articles a JOIN sources s ON s.id = a.source_id
-      WHERE a.story_id = ANY($1::text[]) AND a.image_url IS NOT NULL
+      WHERE a.story_id = ANY($1::text[]) AND a.image_url IS NOT NULL AND s.type <> 'social'
       ORDER BY a.story_id, CASE WHEN s.type IN ('national','regional','independent') THEN 0 ELSE 1 END, a.published_at ASC, a.id`, [ids]);
     for (const image of rows) images.set(image.story_id as string, { url: image.image_url as string, credit: image.credit as string });
   }
@@ -185,7 +161,7 @@ export async function getRegionCoverage(opts: { storyId?: string; sinceHours?: n
         opts.storyId,
       ))
     : (await all(
-        `SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL AND published_at >= $1 GROUP BY region`,
+        `SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL AND published_at >= $1 AND source_id IN (SELECT id FROM sources WHERE type <> 'social') GROUP BY region`,
         sinceIso(opts.sinceHours ?? 48),
       ));
   return await coverageFromRegionCounts(new Map(rows.map((r) => [r.region as string, r.n as number])));
@@ -238,7 +214,7 @@ export async function listStories(f: StoryFilter = {}): Promise<StorySummary[]> 
   if (articleConds.length) {
     where.push(
       `EXISTS (SELECT 1 FROM public_articles a JOIN sources s ON s.id = a.source_id
-               WHERE a.story_id = st.id AND ${articleConds.join(" AND ")})`,
+               WHERE a.story_id = st.id AND ${f.sourceType === "social" ? "1=1" : "s.type <> 'social'"} AND ${articleConds.join(" AND ")})`,
     );
   }
   const limit = bind(f.limit ?? 30);
@@ -292,7 +268,7 @@ export async function getStory(id: string): Promise<StoryDetail | null> {
   }));
   const factChecks = (await all(`SELECT * FROM fact_checks WHERE story_id = $1`, id)).map(toFactCheck);
   const langCounts = new Map<LanguageId, number>();
-  for (const a of articles) langCounts.set(a.language, (langCounts.get(a.language) ?? 0) + 1);
+  for (const a of articles) if (a.source.type !== "social") langCounts.set(a.language, (langCounts.get(a.language) ?? 0) + 1);
   return {
     ...summary,
     createdAt: r.created_at as string,
@@ -404,6 +380,7 @@ export async function search(q: string, limit = 25): Promise<StorySummary[]> {
     `SELECT st.* FROM public_stories st
      WHERE lower(st.title) ILIKE $1 OR lower(st.summary) ILIKE $2 OR lower(st.topic) ILIKE $3
         OR EXISTS (SELECT 1 FROM public_articles a WHERE a.story_id = st.id
+                   AND a.source_id IN (SELECT id FROM sources WHERE type <> 'social')
                    AND (lower(a.headline) ILIKE $4 OR lower(a.excerpt) ILIKE $5))
      ORDER BY st.updated_at DESC LIMIT $6`,
     term,
@@ -433,8 +410,8 @@ export async function getTrendingTopics(sinceHours = 72) {
 export async function getPlatformStats() {
   const since = sinceIso(24);
   return {
-    articlesToday: ((await one(`SELECT COUNT(*)::int n FROM public_articles WHERE published_at >= $1`, since))!.n as number) ?? 0,
-    sources: (await one(`SELECT COUNT(*)::int n FROM sources WHERE active = 1`))!.n as number,
+    articlesToday: ((await one(`SELECT COUNT(*)::int n FROM public_articles a JOIN sources s ON s.id=a.source_id WHERE a.published_at >= $1 AND s.type <> 'social'`, since))!.n as number) ?? 0,
+    sources: (await one(`SELECT COUNT(*)::int n FROM sources WHERE active = 1 AND type <> 'social'`))!.n as number,
     stories: (await one(`SELECT COUNT(*)::int n FROM public_stories WHERE updated_at >= $1`, since))!.n as number,
   };
 }

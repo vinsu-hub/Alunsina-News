@@ -141,6 +141,7 @@ export const ANGLES: Record<string, string[]> = {
 };
 
 export function anglesFor(ms: MemberRow[]): { angle: string; share: number }[] {
+  ms = ms.filter((m) => m.sourceType !== "social");
   const counts = new Map<string, number>();
   for (const m of ms) {
     const text = `${m.headline} ${m.excerpt}`.toLowerCase();
@@ -172,6 +173,7 @@ const FIRST_LABEL: Record<SourceTypeId, string> = {
 };
 
 export function timelineFor(ms: MemberRow[]) {
+  ms = ms.filter((m) => m.sourceType !== "social");
   const events: { at: string; label: string; type: SourceTypeId | null; articleId: string | null }[] = [];
   const seenTypes = new Set<SourceTypeId>();
   const seenSources = new Set<string>();

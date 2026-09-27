@@ -45,7 +45,7 @@ export async function loadWindow(db: Db, now: number, hours: number = CLUSTERING
   const since = new Date(now - hours * 3600_000).toISOString();
   const rows = (await db.query(`SELECT a.id, a.story_id, a.source_id, s.type, a.headline, a.excerpt, a.published_at, a.region, a.language
        FROM articles a JOIN sources s ON s.id = a.source_id
-       WHERE NOT EXISTS (SELECT 1 FROM pitch_publications p WHERE p.article_id=a.id AND p.screening_status <> 'passed') AND (a.published_at >= $1 OR a.story_id IN (SELECT id FROM stories WHERE updated_at >= $2))`, [since, since])) as Record<string, string | null>[];
+       WHERE s.type <> 'social' AND NOT EXISTS (SELECT 1 FROM pitch_publications p WHERE p.article_id=a.id AND p.screening_status <> 'passed') AND (a.published_at >= $1 OR a.story_id IN (SELECT id FROM stories WHERE updated_at >= $2))`, [since, since])) as Record<string, string | null>[];
   const tfs = rows.map((r) => termFreq(tokenize(r.excerpt ?? ""), 1, termFreq(tokenize(r.headline!), 2)));
   const idf = idfFrom(tfs);
   return rows.map((r, i) => ({

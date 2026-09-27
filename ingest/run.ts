@@ -16,6 +16,8 @@ async function main() {
   items fetched     ${s.articlesSeen}
   new articles      ${s.articlesNew}
   feed images       ${s.articlesWithImages}
+  external items    ${s.external.accepted} accepted / ${s.external.rejected} rejected / ${s.external.inserted} inserted (${s.external.files} files)
+  social signals    ${s.social.reddit} Reddit / ${s.social.x} X; ${s.social.attached} attached / ${s.social.unmatched} unmatched
   related links     ${s.related.links} (confidence >= 0.6)
   new fact-checks   ${s.factChecksNew}
   stories touched   ${s.storiesTouched} (${s.storiesCreated} new, ${s.storiesMerged} merged)

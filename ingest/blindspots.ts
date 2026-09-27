@@ -25,6 +25,8 @@ const list = (xs: string[]) => (xs.length <= 2 ? xs.join(" and ") : `${xs.slice(
 
 export function detect(ms: MemberRow[], storyId: string, title: string, ctx: { hasFactCheck: boolean; now: number }): Flag[] {
   const flags: Flag[] = [];
+  const socialPosts = ms.filter((m) => m.sourceType === "social");
+  ms = ms.filter((m) => m.sourceType !== "social");
   const n = ms.length;
   const q = `“${short(title)}”`;
   const href = (anchor: string) => `/story/${storyId}${anchor}`;
@@ -141,13 +143,15 @@ export function detect(ms: MemberRow[], storyId: string, title: string, ctx: { h
   }
 
   // Social / misinformation
-  const social = ms.filter((m) => m.sourceType === "social").length;
+  const reddit = socialPosts.filter((m) => m.sourceId === "social-reddit").length;
+  const x = socialPosts.filter((m) => m.sourceId === "social-x").length;
+  const social = reddit + x;
   const independent = ms.filter((m) => m.sourceType === "independent").length;
   if (social >= R.social.minSocialMentions && independent <= R.social.maxIndependentReports && !ctx.hasFactCheck)
     flags.push({
       type: "social",
-      reason: `${social} tracked social post${social === 1 ? "" : "s"} and no independent outlet or fact-checker has addressed the claim yet.`,
-      example: `A claim related to ${q} is spreading online. No independent reporting has confirmed or debunked it yet.`,
+      reason: `${reddit} Reddit post${reddit === 1 ? "" : "s"}, ${x} X post${x === 1 ? "" : "s"}, and no independent reporting yet.`,
+      example: `A claim related to ${q} is circulating online. No independent outlet has reported on it yet.`,
       linkLabel: "See the claim and official statements",
       linkHref: href("#blindspots"),
     });

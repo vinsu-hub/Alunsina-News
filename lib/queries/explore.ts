@@ -93,8 +93,8 @@ export async function trendingSubjects() {
   ];
   return (await Promise.all(subjects.map(async ([label, query]) => {
     const row = (await all(`SELECT COUNT(DISTINCT st.id)::int stories, COUNT(a.id)::int articles
-      FROM public_stories st JOIN public_articles a ON a.story_id = st.id
-      WHERE lower(st.title) ILIKE $1`, `%${query.toLowerCase()}%`))[0];
+      FROM public_stories st JOIN public_articles a ON a.story_id = st.id JOIN sources sx ON sx.id = a.source_id
+      WHERE sx.type <> 'social' AND lower(st.title) ILIKE $1`, `%${query.toLowerCase()}%`))[0];
     return { label, query, stories: Number(row.stories), articles: Number(row.articles) };
   }))).filter((s) => s.stories > 0).sort((a, b) => b.articles - a.articles || a.label.localeCompare(b.label));
 }
@@ -104,7 +104,7 @@ export async function placeStoryCounts() {
   const byRegion = new Map<string, number>(
     (await all(
       `SELECT region, COUNT(DISTINCT story_id)::int n FROM public_articles
-       WHERE region IS NOT NULL AND story_id IS NOT NULL GROUP BY region`,
+       WHERE region IS NOT NULL AND story_id IS NOT NULL AND source_id IN (SELECT id FROM sources WHERE type <> 'social') GROUP BY region`,
     )).map((r) => [r.region as string, r.n as number]),
   );
   const byIsland = new Map<string, number>();
@@ -112,7 +112,7 @@ export async function placeStoryCounts() {
     const ids = REGIONS.filter((r) => r.island === g.id).map((r) => r.id);
     const row = (await all(
       `SELECT COUNT(DISTINCT story_id)::int n FROM public_articles
-       WHERE story_id IS NOT NULL AND region IN (${ids.map((_, i) => `$${i + 1}`).join(",")})`,
+       WHERE story_id IS NOT NULL AND source_id IN (SELECT id FROM sources WHERE type <> 'social') AND region IN (${ids.map((_, i) => `$${i + 1}`).join(",")})`,
       ...ids,
     ))[0];
     byIsland.set(g.id, (row?.n as number) ?? 0);
@@ -131,7 +131,7 @@ export async function placeStoryCounts() {
 /** Article and story counts per language, for all nine languages. */
 export async function languageCounts(): Promise<{ id: LanguageId; label: string; articles: number; stories: number }[]> {
   const rows = new Map(
-    (await all(`SELECT language, COUNT(*)::int n, COUNT(DISTINCT story_id)::int st FROM public_articles GROUP BY language`)).map((r) => [
+    (await all(`SELECT language, COUNT(*)::int n, COUNT(DISTINCT story_id)::int st FROM public_articles a JOIN sources s ON s.id=a.source_id WHERE s.type <> 'social' GROUP BY language`)).map((r) => [
       r.language as string,
       r,
     ]),
@@ -155,13 +155,13 @@ export async function sourceTypeCounts(): Promise<Record<SourceTypeId, number>> 
 /** Region and language facets for a topic (distinct stories), for the topic sidebar. */
 export async function topicFacets(topic: string) {
   const regions = await all(
-    `SELECT a.region, COUNT(DISTINCT a.story_id)::int n FROM public_articles a JOIN public_stories st ON st.id = a.story_id
-     WHERE lower(st.topic) = lower($1) AND a.region IS NOT NULL GROUP BY a.region`,
+    `SELECT a.region, COUNT(DISTINCT a.story_id)::int n FROM public_articles a JOIN public_stories st ON st.id = a.story_id JOIN sources s ON s.id = a.source_id
+     WHERE lower(st.topic) = lower($1) AND a.region IS NOT NULL AND s.type <> 'social' GROUP BY a.region`,
     topic,
   );
   const languages = await all(
-    `SELECT a.language, COUNT(DISTINCT a.story_id)::int n FROM public_articles a JOIN public_stories st ON st.id = a.story_id
-     WHERE lower(st.topic) = lower($1) GROUP BY a.language`,
+    `SELECT a.language, COUNT(DISTINCT a.story_id)::int n FROM public_articles a JOIN public_stories st ON st.id = a.story_id JOIN sources s ON s.id = a.source_id
+     WHERE lower(st.topic) = lower($1) AND s.type <> 'social' GROUP BY a.language`,
     topic,
   );
   return {
@@ -176,13 +176,13 @@ export async function topicFacets(topic: string) {
 export async function placeCoverage(place: Place) {
   const condition = place.kind === "national"
     ? "SELECT a.story_id FROM public_articles a JOIN sources s ON s.id = a.source_id WHERE s.type = 'national'"
-    : `SELECT story_id FROM public_articles WHERE region IN (${place.regionIds.map((_, i) => `$${i + 1}`).join(",")})`;
+    : `SELECT a.story_id FROM public_articles a JOIN sources s ON s.id = a.source_id WHERE s.type <> 'social' AND a.region IN (${place.regionIds.map((_, i) => `$${i + 1}`).join(",")})`;
   const scoped = await all(
-    `SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL
+    `SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL AND source_id IN (SELECT id FROM sources WHERE type <> 'social')
      AND story_id IN (${condition}) GROUP BY region`,
     ...(place.kind === "national" ? [] : place.regionIds),
   );
-  const baseline = await all(`SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL GROUP BY region`);
+  const baseline = await all(`SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL AND source_id IN (SELECT id FROM sources WHERE type <> 'social') GROUP BY region`);
   const coverage = async (rows: Row[]) => (await coverageFromRegionCounts(new Map(rows.map((r) => [r.region as string, r.n as number]))));
   return { coverage: await coverage(scoped), compareTo: await coverage(baseline) };
 }
@@ -236,8 +236,8 @@ export async function regionComparison(regionIds: RegionId[]): Promise<RegionCom
   let windowLabel = windows[0][1];
   for (const [h, label] of windows) {
     rows = h
-      ? (await all(`SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL AND published_at >= $1 GROUP BY region`, sinceIso(h)))
-      : (await all(`SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL GROUP BY region`));
+      ? (await all(`SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL AND published_at >= $1 AND source_id IN (SELECT id FROM sources WHERE type <> 'social') GROUP BY region`, sinceIso(h)))
+      : (await all(`SELECT region, COUNT(*)::int n FROM public_articles WHERE region IS NOT NULL AND source_id IN (SELECT id FROM sources WHERE type <> 'social') GROUP BY region`));
     windowLabel = label;
     if (rows.length) break;
   }
