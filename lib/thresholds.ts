@@ -59,3 +59,9 @@ export const RELATED_STORIES = {
   minConfidenceShown: 0.6,
   text: "Related Stories are candidate separate events in an ongoing situation: they must share a named person, place or institution in their titles and the same topic, begin at least 6 hours and no more than 14 days apart, and have moderate text similarity (0.12 to below 0.32), below the coverage grouping threshold. Confidence combines text similarity and shared names; only scores of 0.6 or higher are shown. These automated links can be wrong.",
 } as const;
+
+/** Editorial placement uses reporting signals only. */
+export const PLACEMENT = {
+  weights: { sources: 0.2, diversity: 0.2, reach: 0.2, recency: 0.2, related: 0.2 },
+  text: "Every 12 hours, at 06:00 and 18:00 Asia/Manila, active stories are ranked using five equally weighted signals: distinct reporting outlets (log-scaled), source-type diversity across nine types, regional reach across eighteen regions, recency since the last update, and a recent confidence-qualified Related Stories link. The highest-ranked story leads; ranks 1–5 form the Daily Briefing, 2–4 are featured, and 5–16 are top stories. Placements are frozen for the edition and scores are logged for review. Clicks, time-on-page, and other engagement or virality metrics are never used.",
+} as const;

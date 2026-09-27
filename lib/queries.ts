@@ -430,17 +430,25 @@ export async function getLastIngest() {
 
 /** Everything the front page needs. Only stories with 2+ sources are front-page eligible. */
 export async function getEdition(): Promise<Edition> {
-  let pool = await listStories({ sinceHours: 72, limit: 60 });
-  if (pool.length < 5) pool = await listStories({ limit: 60 });
-  const multi = pool.filter((s) => s.stats.sources >= 2);
-  const ranked = multi.length >= 5 ? multi : pool;
-  const lead = ranked[0] ? (await getStory(ranked[0].id)) : null;
+  const { latestEditionPlacements } = await import("./queries/editions");
+  const frozen = await latestEditionPlacements();
+  let ranked: StorySummary[] = [];
+  if (!frozen) {
+    let pool = await listStories({ sinceHours: 72, limit: 60 });
+    if (pool.length < 5) pool = await listStories({ limit: 60 });
+    const multi = pool.filter((s) => s.stats.sources >= 2);
+    ranked = multi.length >= 5 ? multi : pool;
+  }
+  const summaries = frozen ? await toSummaries(frozen.stories) : [];
+  const slot = (name: string) => frozen!.placements.filter(p => p.slot === name)
+    .flatMap(p => summaries.filter(s => s.id === p.story_id));
+  const leadId = frozen ? slot("lead")[0]?.id : ranked[0]?.id;
   return {
-    date: new Date().toISOString(),
-    briefing: ranked.slice(0, 5),
-    lead,
-    featured: ranked.slice(1, 4),
-    topStories: ranked.slice(4, 16),
+    date: frozen?.edition.edition_at ?? new Date().toISOString(),
+    briefing: frozen ? slot("briefing") : ranked.slice(0, 5),
+    lead: leadId ? await getStory(leadId) : null,
+    featured: frozen ? slot("featured") : ranked.slice(1, 4),
+    topStories: frozen ? slot("top") : ranked.slice(4, 16),
     blindspots: await currentBlindspotsByType(),
     coverage: await getRegionCoverage({ sinceHours: 48 }),
     trendingTopics: await getTrendingTopics(),

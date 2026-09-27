@@ -4,6 +4,7 @@
  * optional LLM pass → prune old data. Records an `ingest_runs` row.
  * The first live run removes the fictional sample edition.
  */
+import { runEditorialEdition } from "./placement";
 import { insertRows, timedDb } from "./perf";
 import { refreshTrendingTerms } from "./trends";
 import { rescreenPending } from "../lib/prescreen";
@@ -160,6 +161,7 @@ export async function runIngest(
         blindspots += await stage("blindspots", () => detectBlindspots(db, story.id, now, { members: ms, title: story.title, hasFactCheck: story.has_fact_check }));
       }
       const related = await stage("related", () => linkRelatedStories(db, now));
+      await runEditorialEdition(db, now);
 
       await stage("prune", async () => {
       const cutoff = new Date(now - RETAIN_DAYS * 86400_000).toISOString();
