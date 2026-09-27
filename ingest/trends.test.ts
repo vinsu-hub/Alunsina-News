@@ -37,11 +37,11 @@ test("live-list regression merges Sara into Sara Duterte and removes date and ge
  assert.equal(terms.find((t) => t.slug === "sara-duterte")?.articles, 9);
 });
 test("drops a subterm at 60 percent mention containment but retains independent mentions", () => {
- const make = (inside: number) => Array.from({length:5}, (_,i) => row(i, i < inside ? "Sara Duterte speaks" : "Duterte speaks"));
- assert.equal(rankTrendingTerms(make(3), now).some((t) => t.slug === "duterte"), false);
- assert.equal(rankTrendingTerms(make(2), now).some((t) => t.slug === "duterte"), true);
- const independent = [...make(3), row(10,"Duterte speaks"), row(11,"Duterte speaks")];
- assert.ok(rankTrendingTerms(independent, now).some((t) => t.slug === "duterte"));
+ const make = (inside: number) => Array.from({length:5}, (_,i) => row(i, i < inside ? "South China Sea dispute" : "China speaks"));
+ assert.equal(rankTrendingTerms(make(3), now).some((t) => t.slug === "china"), false);
+ assert.equal(rankTrendingTerms(make(2), now).some((t) => t.slug === "china"), true);
+ const independent = [...make(3), row(10,"China speaks"), row(11,"China speaks")];
+ assert.ok(rankTrendingTerms(independent, now).some((t) => t.slug === "china"));
 });
 test("ambiguous first names are not merged and aliases preserve previous-window counts", () => {
  const ambiguous = [1,2,3].flatMap((i) => [row(i,"Sara Duterte speaks"),row(i+10,"Sara Garcia speaks",undefined,`other-${i}`),row(i+20,"Sara speaks",undefined,`solo-${i}`)]);
@@ -55,4 +55,30 @@ test("caps the ticker at ten and allows at most two heavily overlapping terms", 
  assert.equal(rankTrendingTerms(shared,now).length,2);
  const rows = ["China","Marcos","DPWH","PNP","DepEd","COMELEC","BSKE","NFA","DOH","PAGASA","MMDA"].flatMap((name,j) => [1,2,3].map((i) => row(j*10+i,`${name} announces plans`,undefined,`topic-${j}-${i%2}`)));
  assert.equal(rankTrendingTerms(rows,now).length,10);
+});
+test("production names normalize roles and possessives without guessing bare Duterte", () => {
+ for (const headline of ["Sara Duterte itinangging kilala si Gracioso, tumanggap ng pera mula rito", "Palace tells Sara Duterte: Defend with proof, not fallacies", "Pagpapardon kay Mary Jane Veloso, nasa executive power ni Pres. Marcos – VP Sara", "Vice President Sara Duterte’s response"]) {
+  assert.equal(candidateTerms(headline).get("sara duterte"), "Sara Duterte");
+  assert.equal(candidateTerms(headline).has("duterte"), false);
+ }
+ for (const headline of ["Ex-President Duterte faces trial", "FPRRD faces trial", "Former President Rodrigo Duterte faces trial"]) assert.equal(candidateTerms(headline).get("rodrigo duterte"), "Rodrigo Duterte");
+ assert.equal(candidateTerms("Duterte counsel seeks limit").has("duterte"), false);
+});
+test("production geographic suffixes and generic categories never trend alone", () => {
+ for (const headline of ["DepEd-Davao City recommends transparent school bags for students, but safety measure mandatory’", "₱3.7M worth of suspected marijuana seized in Cebu City", "Mental Health and Surveys: We Cannot Help What We Do Not Measure", "DOH health advisory", "Weather Economy Prices Province Island Shoal Sur Norte"]) {
+  const terms = candidateTerms(headline);
+  for (const word of ["city", "province", "island", "health", "weather", "economy", "prices", "shoal", "sur", "norte"]) assert.equal(terms.has(word), false, word);
+ }
+ assert.ok(candidateTerms("DepEd-Davao City recommends transparent school bags for students").has("davao city"));
+ assert.ok(candidateTerms("₱3.7M worth of suspected marijuana seized in Cebu City").has("cebu city"));
+ assert.ok(candidateTerms("DOH health advisory").has("doh"));
+});
+test("production El Niño variants share a diacritic-preserving display and slug", () => {
+ const headlines = ["El Niño affecting 14 regions, agriculture sustains P6.87-B damage", "Presyo ng palay inaasahang tataas ang presyo kapag tumama ang severe El Nino – NFA", "NFA expects palay prices to rise to P30/kg as severe El Niño looms"];
+ for (const headline of headlines) {
+  assert.equal(candidateTerms(headline).get("el nino"), "El Niño");
+  assert.equal(candidateTerms(headline).has("nino"), false);
+ }
+ const term = rankTrendingTerms(headlines.map((headline, i) => row(i, headline)), now).find((term) => term.slug === "el-nino");
+ assert.equal(term?.term, "El Niño");
 });

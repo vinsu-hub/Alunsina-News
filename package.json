@@ -9,6 +9,7 @@
     "lint": "eslint",
     "seed": "tsx db/seed.ts",
     "ingest": "NODE_OPTIONS=--conditions=react-server tsx ingest/run.ts",
+    "trends:preview": "tsx --env-file=.env.local ingest/trends-preview.ts",
     "check-feeds": "tsx scripts/check-feeds.ts",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx db/migrate.ts"
