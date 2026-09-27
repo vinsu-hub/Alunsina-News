@@ -4,7 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 import { getDb } from "@/db/client";
 import { runIngest } from "@/ingest/pipeline";
 
-export const maxDuration = 540;
+export const maxDuration = 300; // Vercel Hobby ceiling
 
 let running = false;
 
