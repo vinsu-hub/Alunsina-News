@@ -4,13 +4,14 @@
  * optional LLM pass → prune old data. Records an `ingest_runs` row.
  * The first live run removes the fictional sample edition.
  */
+import { insertRows, timedDb } from "./perf";
 import { refreshTrendingTerms } from "./trends";
 import { rescreenPending } from "../lib/prescreen";
 import type { Db } from "../db/client";
 import { FEEDS } from "../config/feeds";
 import { detectBlindspots } from "./blindspots";
 import { cluster } from "./cluster";
-import { deriveStory, linkFactChecks } from "./derive";
+import { deriveStory, linkFactChecks, loadMembersMany } from "./derive";
 import { fetchAll } from "./fetch";
 import { archiveExternal, readExternal } from "./external";
 import { fetchReddit } from "./social/reddit";
@@ -43,6 +44,7 @@ export interface IngestSummary {
   llm: { updated: number; errors: string[] };
   removedSample: boolean;
   durationMs: number;
+  stages: Record<string, number>;
 }
 
 async function removeSample(db: Db): Promise<boolean> {
@@ -58,49 +60,44 @@ async function removeSample(db: Db): Promise<boolean> {
 }
 
 async function upsertSources(db: Db) {
-  for (const f of FEEDS) {
+  const rows = FEEDS.map((f) => {
     // Public-listing collectors are active headline+link sources; unresolved feed sources stay inactive.
     const active = !f.factCheck && ((f.verified && f.feeds.length > 0) || f.collector === "agent-reach") ? 1 : 0;
-    await db.execute(
+    return [
+        f.id, f.name, f.type, f.ownership, f.ownershipSource,
+        f.collector === "agent-reach" && !f.feeds.length ? "link" : f.dataStatus,
+        f.paywalled ? 1 : 0, f.homepage, f.feeds[0] ?? null,
+        JSON.stringify(f.regions), JSON.stringify(f.languages), JSON.stringify(f.topics ?? []), active,
+    ];
+  });
+  await insertRows(db,
       `INSERT INTO sources (id,name,type,ownership,ownership_source,data_status,paywalled,homepage,feed_url,regions,languages,topics,active)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-     ON CONFLICT(id) DO UPDATE SET name=excluded.name, type=excluded.type, ownership=excluded.ownership,
+`, rows, `ON CONFLICT(id) DO UPDATE SET name=excluded.name, type=excluded.type, ownership=excluded.ownership,
        ownership_source=excluded.ownership_source, data_status=excluded.data_status, paywalled=excluded.paywalled,
        homepage=excluded.homepage, feed_url=excluded.feed_url, regions=excluded.regions, languages=excluded.languages,
-       topics=excluded.topics, active=excluded.active`,
-      [
-        f.id,
-        f.name,
-        f.type,
-        f.ownership,
-        f.ownershipSource,
-        f.collector === "agent-reach" && !f.feeds.length ? "link" : f.dataStatus,
-        f.paywalled ? 1 : 0,
-        f.homepage,
-        f.feeds[0] ?? null,
-        JSON.stringify(f.regions),
-        JSON.stringify(f.languages),
-        JSON.stringify(f.topics ?? []),
-        active,
-      ],
-    );
-  }
+       topics=excluded.topics, active=excluded.active`);
 }
 
 export async function runIngest(
   db: Db,
   opts: { dryRun?: boolean; now?: number; llm?: boolean } = {},
 ): Promise<IngestSummary> {
+  db = timedDb(db);
+  const stages: Record<string, number> = Object.fromEntries(["fetch", "insert", "external", "social", "cluster", "derive", "blindspots", "related", "trends", "rescreen", "prune"].map((stage) => [stage, 0]));
+  async function stage<T>(name: string, fn: () => Promise<T>): Promise<T> {
+    const start = performance.now();
+    try { return await fn(); } finally { stages[name] += performance.now() - start; }
+  }
   const t0 = Date.now();
   const now = opts.now ?? Date.now();
   const dryRun = Boolean(opts.dryRun);
   const llm = new LlmRun(opts.llm !== false && !dryRun);
-  const fetched = await fetchAll(now);
-  const external = await readExternal(now);
+  const fetched = await stage("fetch", () => fetchAll(now));
+  const external = await stage("external", () => readExternal(now));
   fetched.items.push(...external.items);
   const topicRows = await db.query<{ title: string }>(`SELECT title FROM stories WHERE updated_at >= $1 ORDER BY score DESC LIMIT 10`, [new Date(now - 48 * 3600_000).toISOString()]);
   const topics = [...topicRows.map((r) => r.title), ...fetched.items.slice(0, 10).map((r) => r.headline)];
-  const [reddit, x] = await Promise.all([fetchReddit(topics, now), fetchX(topics, now)]);
+  const [reddit, x] = await stage("social", () => Promise.all([fetchReddit(topics, now), fetchX(topics, now)]));
   const socialItems = [...reddit.items, ...x.items];
   const socialSummary = { reddit: reddit.items.length, x: x.items.length, attached: 0, unmatched: 0, errors: [...reddit.errors, ...x.errors] };
   let externalAttached = 0;
@@ -115,68 +112,47 @@ export async function runIngest(
         [new Date(t0).toISOString()],
       ))!.id;
       const removedSample = await removeSample(db);
-      await upsertSources(db);
-
-      let articlesNew = 0,
-        factChecksNew = 0;
-      const fetchedAt = new Date(now).toISOString();
-      for (const it of fetched.items) {
-        if (it.source.factCheck) {
-          factChecksNew += Number(
-            (
-              await db.execute(
-                `INSERT INTO fact_checks (story_id, claim, org, rating, url, published_at) VALUES (NULL,$1,$2,NULL,$3,$4) ON CONFLICT DO NOTHING`,
-                [it.headline, it.source.name, it.url, it.publishedAt],
-              )
-            ).changes,
-          );
-          continue;
+      let articlesNew = 0, factChecksNew = 0;
+      await stage("insert", async () => {
+        await upsertSources(db);
+        const fetchedAt = new Date(now).toISOString();
+        const factChecks = fetched.items.filter((it) => it.source.factCheck);
+        factChecksNew = await insertRows(db, `INSERT INTO fact_checks (story_id,claim,org,rating,url,published_at)`, factChecks.map((it) => [null, it.headline, it.source.name, null, it.url, it.publishedAt]), "ON CONFLICT DO NOTHING");
+        // RETURNING preserves inserted counts even when input URLs repeat.
+        for (let offset = 0; offset < fetched.items.length; offset += 500) {
+          const items = fetched.items.slice(offset, offset + 500).filter((it) => !it.source.factCheck);
+          if (!items.length) continue;
+          const params: unknown[] = [];
+          const values = items.map((it) => {
+            const row = [articleId(it.url), it.source.id, null, it.headline, it.byline, it.url, it.excerpt, it.publishedAt, detectLanguage(`${it.headline}. ${it.excerpt}`, it.source.languages), tagRegion(it.headline, it.excerpt, it.source), fetchedAt, it.imageUrl, it.imageCredit];
+            return `(${row.map((value) => { params.push(value); return `$${params.length}`; }).join(",")})`;
+          });
+          const inserted = await db.query<{ id: string }>(`INSERT INTO articles (id,source_id,story_id,headline,byline,url,excerpt,published_at,language,region,fetched_at,image_url,image_credit) VALUES ${values.join(",")} ON CONFLICT DO NOTHING RETURNING id`, params);
+          articlesNew += inserted.length;
+          const externalIds = new Set(items.filter((it) => external.items.includes(it)).map((it) => articleId(it.url)));
+          externalAttached += inserted.filter((row) => externalIds.has(row.id)).length;
         }
-        const text = `${it.headline}. ${it.excerpt}`;
-        const lang = detectLanguage(text, it.source.languages);
-        const region = tagRegion(it.headline, it.excerpt, it.source);
-        const inserted = Number(
-          (
-            await db.execute(
-              `INSERT INTO articles (id,source_id,story_id,headline,byline,url,excerpt,published_at,language,region,fetched_at,image_url,image_credit)
-       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING`,
-              [
-                articleId(it.url),
-                it.source.id,
-                it.headline,
-                it.byline,
-                it.url,
-                it.excerpt,
-                it.publishedAt,
-                lang,
-                region,
-                fetchedAt,
-                it.imageUrl,
-                it.imageCredit,
-              ],
-            )
-          ).changes,
-        );
-        articlesNew += inserted;
-        if (external.items.includes(it)) { externalAttached += inserted; }
-      }
+      });
 
-      const c = await cluster(db, now, llm);
+      const c = await stage("cluster", () => cluster(db, now, llm));
       touched = [...c.touched];
-      const linkedSocial = await attachSocial(db, socialItems, now);
+      const linkedSocial = await stage("social", () => attachSocial(db, socialItems, now));
       socialSummary.attached = linkedSocial.attached;
       socialSummary.unmatched = linkedSocial.unmatched;
       const socialStories = await db.query<{ story_id: string }>(`SELECT DISTINCT story_id FROM articles WHERE source_id IN ('social-reddit','social-x') AND published_at >= $1 AND story_id IS NOT NULL`, [new Date(now - 86400_000).toISOString()]);
       touched = [...new Set([...touched, ...socialStories.map((r) => r.story_id)])];
-      await linkFactChecks(db, touched, now);
+      const members = await stage("derive", () => loadMembersMany(db, touched));
+      await stage("derive", () => linkFactChecks(db, touched, now, members));
+      const contexts = await db.query<{ id: string; title: string; has_fact_check: boolean }>(`SELECT s.id,s.title, EXISTS(SELECT 1 FROM fact_checks f WHERE f.story_id=s.id) has_fact_check FROM stories s WHERE s.id=ANY($1::text[])`, [touched]);
       let blindspots = 0;
-      for (const id of touched) {
-        await deriveStory(db, id);
-        blindspots += await detectBlindspots(db, id, now);
+      for (const story of contexts) {
+        const ms = members.get(story.id) ?? [];
+        await stage("derive", () => deriveStory(db, story.id, ms));
+        blindspots += await stage("blindspots", () => detectBlindspots(db, story.id, now, { members: ms, title: story.title, hasFactCheck: story.has_fact_check }));
       }
+      const related = await stage("related", () => linkRelatedStories(db, now));
 
-      const related = await linkRelatedStories(db, now);
-
+      await stage("prune", async () => {
       const cutoff = new Date(now - RETAIN_DAYS * 86400_000).toISOString();
       await db.execute(`DELETE FROM stories WHERE updated_at < $1`, [cutoff]);
       await db.execute(`DELETE FROM articles WHERE published_at < $1`, [
@@ -186,6 +162,7 @@ export async function runIngest(
         new Date(now - 30 * 86400_000).toISOString(),
       ]);
 
+      });
       const summary: IngestSummary = {
         runId,
         dryRun,
@@ -206,6 +183,7 @@ export async function runIngest(
         llm: { updated: 0, errors: llm.errors },
         removedSample,
         durationMs: 0,
+        stages,
       };
       if (dryRun) {
         summary.runId = null;
@@ -242,8 +220,8 @@ export async function runIngest(
       ],
     );
   }
-  if (!dryRun) { try { await rescreenPending(50, db); } catch (error) { console.error("Non-fatal pending screen failure", error); } }
-  if (!dryRun) await refreshTrendingTerms(db, now);
+  if (!dryRun) { try { await stage("rescreen", () => rescreenPending(50, db)); } catch (error) { console.error("Non-fatal pending screen failure", error); } }
+  if (!dryRun) await stage("trends", () => refreshTrendingTerms(db, now));
   llm.logCounts();
   summary.durationMs = Date.now() - t0;
   return summary;

@@ -25,6 +25,7 @@ async function main() {
   llm summaries     ${s.llm.updated}${s.llm.errors.length ? ` (${s.llm.errors.length} errors)` : ""}
   sample removed    ${s.removedSample}
   duration          ${(s.durationMs / 1000).toFixed(1)}s`);
+  console.log("  stages (ms)      ", JSON.stringify(s.stages));
   for (const e of s.feedErrors) console.log(`  ! ${e.source}: ${e.error} (${e.url})`);
   for (const e of s.llm.errors) console.log(`  ! llm ${e}`);
   for (const pair of s.related.examples) console.log(`  related (${pair.confidence.toFixed(2)}): ${pair.earlier} → ${pair.later}`);

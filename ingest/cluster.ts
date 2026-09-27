@@ -231,10 +231,9 @@ export async function cluster(db: Db, now = Date.now(), llm?: LlmRun): Promise<C
     const status = statusFor(first, last, times.filter((t) => t >= recentCutoff).length, now);
     await db.execute(`INSERT INTO stories (id,title,summary,status,topic,score,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT(id) DO UPDATE SET status=excluded.status, topic=excluded.topic, score=excluded.score, updated_at=excluded.updated_at`, [c.storyId, title, "", status, topic, scoreFor(c.members, now), new Date(first).toISOString(), new Date(last).toISOString()]);
-    for (const m of c.members) if (m.storyId !== c.storyId) {
-      await db.execute(`UPDATE articles SET story_id = $1 WHERE id = $2`, [c.storyId, m.id]);
-      m.storyId = c.storyId;
-    }
+    const reassigned = c.members.filter((m) => m.storyId !== c.storyId);
+    if (reassigned.length) await db.execute(`UPDATE articles SET story_id = $1 WHERE id = ANY($2::text[])`, [c.storyId, reassigned.map((m) => m.id)]);
+    for (const m of reassigned) m.storyId = c.storyId;
     if (changed.has(c) || c.members.some((m) => Date.parse(m.publishedAt) >= now - 6 * 3600_000)) touched.add(c.storyId);
   }
   await db.execute(`UPDATE pitches p SET linked_story_id=a.story_id FROM pitch_publications pp JOIN articles a ON a.id=pp.article_id WHERE pp.pitch_id=p.pitch_id AND a.story_id IS NOT NULL`);

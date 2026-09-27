@@ -7,6 +7,7 @@
  *  - evidence: primary documents and official statements in the cluster
  *  - fact_checks: links fact-check items to the most similar story
  */
+import { replaceRows } from "./perf";
 import { json, type Db } from "../db/client";
 import { SOURCE_TYPE_IDS, type SourceTypeId } from "../lib/taxonomy";
 import { bigrams, centroid, cosine, entities, idfFrom, splitSentences, stripLead, termFreq, tfidf, tokenize, type Vec } from "./text";
@@ -25,11 +26,16 @@ export interface MemberRow {
   language: string;
 }
 
-export async function loadMembers(db: Db, storyId: string): Promise<MemberRow[]> {
-  return (
-    (await db.query(`SELECT a.id, a.source_id, s.name, s.type, s.regions, a.headline, a.excerpt, a.url, a.published_at, a.region, a.language
-         FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.story_id = $1 AND NOT EXISTS (SELECT 1 FROM pitch_publications pp WHERE pp.article_id=a.id AND pp.screening_status <> 'passed') ORDER BY a.published_at ASC`, [storyId])) as Record<string, string | null>[]
-  ).map((r) => ({
+export async function loadMembersMany(db: Db, storyIds: string[]): Promise<Map<string, MemberRow[]>> {
+  if (!storyIds.length) return new Map();
+  const grouped = new Map<string, MemberRow[]>();
+  const rows =
+  (
+    (await db.query(`SELECT a.story_id, a.id, a.source_id, s.name, s.type, s.regions, a.headline, a.excerpt, a.url, a.published_at, a.region, a.language
+         FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.story_id = ANY($1::text[]) AND NOT EXISTS (SELECT 1 FROM pitch_publications pp WHERE pp.article_id=a.id AND pp.screening_status <> 'passed') ORDER BY a.published_at ASC`, [storyIds])) as Record<string, string | null>[]
+  );
+  for (const r of rows) {
+    const member: MemberRow = {
     id: r.id!,
     sourceId: r.source_id!,
     sourceName: r.name!,
@@ -41,7 +47,16 @@ export async function loadMembers(db: Db, storyId: string): Promise<MemberRow[]>
     publishedAt: r.published_at!,
     region: r.region,
     language: r.language!,
-  }));
+    };
+    const list = grouped.get(r.story_id!) ?? [];
+    list.push(member);
+    grouped.set(r.story_id!, list);
+  }
+  return grouped;
+}
+
+export async function loadMembers(db: Db, storyId: string): Promise<MemberRow[]> {
+  return (await loadMembersMany(db, [storyId])).get(storyId) ?? [];
 }
 
 const vecs = (ms: MemberRow[]) => {
@@ -191,33 +206,23 @@ export function timelineFor(ms: MemberRow[]) {
 
 /* ---------- persist ---------- */
 
-export async function deriveStory(db: Db, storyId: string) {
-  const ms = await loadMembers(db, storyId);
+export async function deriveStory(db: Db, storyId: string, members?: MemberRow[]) {
+  const ms = members ?? await loadMembers(db, storyId);
   if (!ms.length) return;
   await db.execute(`UPDATE stories SET summary = $1 WHERE id = $2`, [extractiveSummary(ms), storyId]);
-
-  await db.execute(`DELETE FROM story_emphasis WHERE story_id = $1`, [storyId]);
   const emph = emphasisByType(ms);
-  for (const t of SOURCE_TYPE_IDS) if (emph.has(t)) await db.execute(`INSERT INTO story_emphasis (story_id, source_type, points) VALUES ($1,$2,$3)`, [storyId, t, JSON.stringify(emph.get(t))]);
-
-  await db.execute(`DELETE FROM story_angles WHERE story_id = $1`, [storyId]);
-  for (const a of anglesFor(ms)) await db.execute(`INSERT INTO story_angles (story_id, angle, share, note) VALUES ($1,$2,$3,NULL)`, [storyId, a.angle, a.share]);
-
-  await db.execute(`DELETE FROM timeline_events WHERE story_id = $1`, [storyId]);
-  for (const e of timelineFor(ms)) await db.execute(`INSERT INTO timeline_events (story_id, at, label, source_type, article_id) VALUES ($1,$2,$3,$4,$5)`, [storyId, e.at, e.label, e.type, e.articleId]);
-
-  await db.execute(`DELETE FROM evidence WHERE story_id = $1`, [storyId]);
-  for (const m of ms) {
-    if (m.sourceType === "primary") await db.execute(`INSERT INTO evidence (story_id, kind, title, publisher, url, published_at) VALUES ($1,$2,$3,$4,$5,$6)`, [storyId, "document", m.headline, m.sourceName, m.url, m.publishedAt]);
-    else if (m.sourceType === "government") await db.execute(`INSERT INTO evidence (story_id, kind, title, publisher, url, published_at) VALUES ($1,$2,$3,$4,$5,$6)`, [storyId, "statement", m.headline, m.sourceName, m.url, m.publishedAt]);
-  }
+  await replaceRows(db, "story_emphasis", ["story_id", "source_type", "points"], storyId, SOURCE_TYPE_IDS.filter((t) => emph.has(t)).map((t) => [storyId, t, JSON.stringify(emph.get(t))]));
+  await replaceRows(db, "story_angles", ["story_id", "angle", "share", "note"], storyId, anglesFor(ms).map((a) => [storyId, a.angle, a.share, null]));
+  await replaceRows(db, "timeline_events", ["story_id", "at", "label", "source_type", "article_id"], storyId, timelineFor(ms).map((e) => [storyId, e.at, e.label, e.type, e.articleId]));
+  await replaceRows(db, "evidence", ["story_id", "kind", "title", "publisher", "url", "published_at"], storyId, ms.filter((m) => m.sourceType === "primary" || m.sourceType === "government").map((m) => [storyId, m.sourceType === "primary" ? "document" : "statement", m.headline, m.sourceName, m.url, m.publishedAt]));
 }
 
 /** Attach unlinked fact-checks from the last 7 days to the most similar story (if similar enough). */
-export async function linkFactChecks(db: Db, storyIds: string[], now = Date.now()) {
+export async function linkFactChecks(db: Db, storyIds: string[], now = Date.now(), members?: Map<string, MemberRow[]>) {
   const fcs = (await db.query(`SELECT id, claim FROM fact_checks WHERE story_id IS NULL AND published_at >= $1`, [new Date(now - 7 * 86400_000).toISOString()])) as { id: number; claim: string }[];
   if (!fcs.length || !storyIds.length) return 0;
-  const stories = await Promise.all(storyIds.map(async (id) => ({ id, ms: await loadMembers(db, id) })));
+  const loaded = members ?? await loadMembersMany(db, storyIds);
+  const stories = storyIds.map((id) => ({ id, ms: loaded.get(id) ?? [] }));
   const docs = [...stories.map((s) => termFreq(tokenize(s.ms.map((m) => m.headline).join(" ")))), ...fcs.map((f) => termFreq(tokenize(f.claim)))];
   const idf = idfFrom(docs);
   const sv = stories.map((s, i) => ({ id: s.id, v: tfidf(docs[i], idf) }));

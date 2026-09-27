@@ -1,3 +1,4 @@
+import { insertRows } from "./perf";
 import type { Db } from "../db/client";
 import { FEEDS } from "../config/feeds";
 import { bigrams, entities, normalize, tokenize } from "./text";
@@ -49,7 +50,7 @@ export async function refreshTrendingTerms(db: Db, now = Date.now()) {
   const terms = rankTrendingTerms(rows, now);
   await db.tx(async (tx) => {
     await tx.execute("DELETE FROM trending_terms");
-    for (const t of terms) await tx.execute(`INSERT INTO trending_terms(term,slug,window_start,articles,sources,stories,prev_articles,score,sample_story_ids,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [t.term,t.slug,new Date(now-WEEK).toISOString().slice(0,10),t.articles,t.sources,t.stories,t.prev_articles,t.score,JSON.stringify(t.sample_story_ids),new Date(now).toISOString()]);
+    await insertRows(tx, `INSERT INTO trending_terms(term,slug,window_start,articles,sources,stories,prev_articles,score,sample_story_ids,updated_at)`, terms.map((t) => [t.term,t.slug,new Date(now-WEEK).toISOString().slice(0,10),t.articles,t.sources,t.stories,t.prev_articles,t.score,JSON.stringify(t.sample_story_ids),new Date(now).toISOString()]));
   });
   console.log("Top trending terms:", terms.map((t) => `${t.term} (${t.sources} sources, ${t.stories} stories)`).join(" · ") || "none meeting coverage thresholds");
   return terms;

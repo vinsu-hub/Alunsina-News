@@ -4,6 +4,7 @@
  * distinguish these links from same-event coverage. This is a heuristic,
  * confidence-gated relationship, not a claim of proven causality.
  */
+import { insertRows } from "./perf";
 import type { Db } from "../db/client";
 import { CLUSTERING, RELATED_STORIES } from "../lib/thresholds";
 import { centroid, cosine, entities, idfFrom, termFreq, tfidf, tokenize, type Vec } from "./text";
@@ -36,6 +37,7 @@ export async function linkRelatedStories(db: Db, now = Date.now()): Promise<Rela
   // Recompute current-window links so changed centroids cannot leave stale matches.
   await db.execute(`DELETE FROM story_links WHERE story_id IN (SELECT id FROM stories WHERE created_at >= $1) AND related_story_id IN (SELECT id FROM stories WHERE created_at >= $1)`, [since]);
   const result: RelatedResult = { links: 0, examples: [] };
+  const links: unknown[][] = [];
   for (let i = 0; i < stories.length; i++) {
     const a = stories[i];
     const av = vectors.get(a.id);
@@ -54,10 +56,11 @@ export async function linkRelatedStories(db: Db, now = Date.now()): Promise<Rela
       const confidence = Math.min(1, 0.4 + 0.3 * (sim / CLUSTERING.similarity) + 0.1 * Math.min(shared, 2));
       if (confidence < RELATED_STORIES.minConfidenceShown) continue;
       // Relation describes the target from the source story's perspective.
-      await db.execute(`INSERT INTO story_links (story_id,related_story_id,relation,confidence) VALUES ($1,$2,'later',$3),($2,$1,'earlier',$3) ON CONFLICT(story_id,related_story_id) DO UPDATE SET relation=excluded.relation,confidence=excluded.confidence`, [a.id, b.id, confidence]);
+      links.push([a.id, b.id, "later", confidence], [b.id, a.id, "earlier", confidence]);
       result.links += 2;
       if (result.examples.length < 3) result.examples.push({ earlier: a.title, later: b.title, confidence });
     }
   }
+  await insertRows(db, `INSERT INTO story_links (story_id,related_story_id,relation,confidence)`, links, `ON CONFLICT(story_id,related_story_id) DO UPDATE SET relation=excluded.relation,confidence=excluded.confidence`);
   return result;
 }

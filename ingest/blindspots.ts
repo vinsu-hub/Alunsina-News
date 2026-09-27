@@ -4,6 +4,7 @@
  * renders verbatim. Every flag carries a concrete, numeric reason and a link
  * into the story. A Social blindspot is suppressed once a fact-check is linked.
  */
+import { replaceRows } from "./perf";
 import type { Db } from "../db/client";
 import { BLINDSPOT_RULES as R } from "../lib/thresholds";
 import { REGIONS, type BlindspotTypeId } from "../lib/taxonomy";
@@ -159,14 +160,13 @@ export function detect(ms: MemberRow[], storyId: string, title: string, ctx: { h
   return flags;
 }
 
-export async function detectBlindspots(db: Db, storyId: string, now = Date.now()): Promise<number> {
-  const story = (await db.one(`SELECT title FROM stories WHERE id = $1`, [storyId])) as { title: string } | undefined;
+export async function detectBlindspots(db: Db, storyId: string, now = Date.now(), cached?: { members: MemberRow[]; title: string; hasFactCheck: boolean }): Promise<number> {
+  const story = cached ?? (await db.one(`SELECT title FROM stories WHERE id = $1`, [storyId])) as { title: string } | undefined;
   if (!story) return 0;
-  const ms = await loadMembers(db, storyId);
-  const hasFactCheck = Boolean(await db.one(`SELECT 1 FROM fact_checks WHERE story_id = $1 LIMIT 1`, [storyId]));
+  const ms = cached?.members ?? await loadMembers(db, storyId);
+  const hasFactCheck = cached?.hasFactCheck ?? Boolean(await db.one(`SELECT 1 FROM fact_checks WHERE story_id = $1 LIMIT 1`, [storyId]));
   const flags = detect(ms, storyId, story.title, { hasFactCheck, now });
-  await db.execute(`DELETE FROM blindspots WHERE story_id = $1`, [storyId]);
   const at = new Date(now).toISOString();
-  for (const f of flags) await db.execute(`INSERT INTO blindspots (story_id, type, reason, example, link_label, link_href, detected_at) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [storyId, f.type, f.reason, f.example, f.linkLabel, f.linkHref, at]);
+  await replaceRows(db, "blindspots", ["story_id", "type", "reason", "example", "link_label", "link_href", "detected_at"], storyId, flags.map((f) => [storyId, f.type, f.reason, f.example, f.linkLabel, f.linkHref, at]));
   return flags.length;
 }
