@@ -11,6 +11,10 @@ async function main() {
   console.log(`Ingesting into ${DB_PATH}${args.includes("--dry-run") ? " (dry run)" : ""}…`);
   try {
   const s = await runIngest(db, { dryRun: args.includes("--dry-run"), llm: !args.includes("--no-llm") });
+  if (s.skipped) {
+    console.log("  skipped: another ingest is already writing (advisory lock held). Nothing changed.");
+    return;
+  }
   console.log(`
   feeds ok          ${s.feedsOk} (${s.feedErrors.length} failed)
   items fetched     ${s.articlesSeen}

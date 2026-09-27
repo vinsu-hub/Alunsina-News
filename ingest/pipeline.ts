@@ -23,6 +23,11 @@ import { articleId, detectLanguage, tagRegion } from "./normalize";
 import { linkRelatedStories, type RelatedResult } from "./related";
 
 const RETAIN_DAYS = 14;
+/** Transaction-scoped advisory lock key: only one ingest may write at a time (works with the Supabase transaction pooler). */
+const INGEST_LOCK_KEY = 84_220_927;
+
+/** Thrown inside the transaction when another ingest holds the lock; the run is skipped, not failed. */
+class IngestBusy extends Error {}
 
 export interface IngestSummary {
   runId: number | null;
@@ -45,6 +50,8 @@ export interface IngestSummary {
   removedSample: boolean;
   durationMs: number;
   stages: Record<string, number>;
+  /** Set when the run was skipped because another ingest was already writing. */
+  skipped?: "another_ingest_running";
 }
 
 async function removeSample(db: Db): Promise<boolean> {
@@ -107,6 +114,8 @@ export async function runIngest(
   let touched: string[] = [];
   try {
     result = await db.tx(async (db) => {
+      const lock = await db.one<{ ok: boolean }>(`SELECT pg_try_advisory_xact_lock($1) AS ok`, [INGEST_LOCK_KEY]);
+      if (!lock?.ok) throw new IngestBusy();
       const runId = (await db.one<{ id: number }>(
         `INSERT INTO ingest_runs (started_at) VALUES ($1) RETURNING id`,
         [new Date(t0).toISOString()],
@@ -193,6 +202,18 @@ export async function runIngest(
       return summary;
     });
   } catch (error) {
+    if (error instanceof IngestBusy) {
+      console.warn("Another ingest is writing; skipping this run.");
+      return {
+        runId: null, dryRun, feedsOk: fetched.feedsOk, feedErrors: fetched.errors, articlesSeen: fetched.items.length,
+        articlesNew: 0, articlesWithImages: 0,
+        external: { accepted: 0, rejected: 0, files: 0, fileErrors: [], inserted: 0 }, // files stay in place for the next run
+        social: socialSummary, related: { links: 0, examples: [] }, llmCalls: llm.counts,
+        factChecksNew: 0, storiesTouched: 0, storiesCreated: 0, storiesMerged: 0, blindspots: 0,
+        llm: { updated: 0, errors: [] }, removedSample: false, durationMs: Date.now() - t0, stages,
+        skipped: "another_ingest_running",
+      };
+    }
     if (error !== rollback) throw error;
   }
   const summary = result!;
