@@ -389,6 +389,7 @@ export async function seed() {
     }
     await seedContributors(db);
     await seedPitches(db);
+    await seedTrendingTerms(db);
     return { sources: SOURCES.length, stories: STORIES.length, articles: STORIES.reduce((a, s) => a + s.articles.length, 0) };
   });
 }
@@ -434,4 +435,15 @@ async function seedPitches(db: Db) {
     ['sample-pitch-pending','sample-journalist-cebu','Sample pitch awaiting automated screening','r7','Sample held content.','this week','pitched','pending',0,null],
     ['sample-pitch-flagged','sample-journalist-zamboanga','Sample pitch held after safety screening','r9','Sample flagged content.','ongoing','pitched','flagged',0,null],
   ] as const) await db.execute(`INSERT INTO pitches(pitch_id,reporter_id,topic,region,angle,timeframe,status,screening_status,screening_categories,created_at,updated_at,status_changed_at,linked_blindspot_id,screened_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$10,$11,CASE WHEN $8='pending' THEN NULL ELSE now() END)`,[id,reporter,topic,region,angle,timeframe,status,screen,JSON.stringify(screen==='flagged'?['sample_safety_category']:[]),ago(age),linked]);
+}
+
+async function seedTrendingTerms(db: Db) {
+  await db.execute("DELETE FROM trending_terms");
+  await db.execute(`INSERT INTO trending_terms(term,slug,window_start,articles,sources,stories,prev_articles,score,sample_story_ids)
+    SELECT t.term,t.slug,current_date-7,count(*)::int,count(DISTINCT a.source_id)::int,
+      count(DISTINCT a.story_id)::int,0,count(*)::real,jsonb_agg(DISTINCT a.story_id)
+    FROM (VALUES ('Rice','rice'),('Flooding','flooding'),('Cebu','cebu')) t(term,slug)
+    JOIN public_articles a ON a.headline ~* ('\\m' || t.term || '\\M')
+    WHERE a.source_id LIKE 'sample-%' AND a.story_id IS NOT NULL
+    GROUP BY t.term,t.slug`);
 }

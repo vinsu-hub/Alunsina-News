@@ -117,13 +117,16 @@ export const FEEDS: FeedSource[] = [
     name: "Manila Standard",
     type: "national",
     homepage: "https://manilastandard.net",
-    feeds: ["https://manilastandard.net/feed"],
+    feeds: [],
+    collector: "agent-reach",
+    listingUrls: ["https://manilastandard.net/"],
+    feedNote: "RSS HTTP 403 with honest Alunsina reader UA on 2026-09-27; use public listing collector.",
     ownership: "Philippine Manila Standard Publishing, Inc.",
     ownershipSource: "Publisher's About page",
     dataStatus: "feed",
     regions: ["ncr"],
     languages: ["en"],
-    verified: true,
+    verified: false,
   },
   {
     id: "businessworld",
@@ -428,13 +431,13 @@ export const FEEDS: FeedSource[] = [
   },
 
   {
-    id: "gma-regional-amianan", name: "GMA Regional TV Balitang Amianan", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/", collector: "agent-reach", listingUrls: ["https://www.gmanetwork.com/regionaltv/balitangamianan"],
+    id: "gma-regional-amianan", name: "GMA Regional TV Balitang Amianan", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/",
     feeds: [], ownership: "GMA Network, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
     regions: ["r1","r2","r3","car"], languages: ["fil","ilo"], verified: false,
-    feedNote: "Only GMA's broad network RSS was returned; no desk-specific feed verified.",
+    feedNote: "No stable desk listing; covered via GMA network RSS. Probed 2026-09-27; candidate listings discover only broad network RSS.",
   },
   {
-    id: "cebu-daily-news", name: "Cebu Daily News (CDN Digital)", type: "regional", homepage: "https://cebudailynews.inquirer.net",
+    id: "cebu-daily-news", collector: "agent-reach", listingUrls: ["https://cebudailynews.inquirer.net/"], name: "Cebu Daily News (CDN Digital)", type: "regional", homepage: "https://cebudailynews.inquirer.net",
     feeds: [], ownership: "Philippine Daily Inquirer, Inc. (Inquirer Group)", ownershipSource: "Publisher About page", dataStatus: "feed",
     regions: ["r7"], languages: ["en","ceb"], verified: false,
     feedNote: "HTTP 403 on 2026-09-27; use Agent Reach listing collection.",
@@ -450,7 +453,7 @@ export const FEEDS: FeedSource[] = [
     id: "gma-regional-bisdak", name: "GMA Regional TV Balitang Bisdak", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/", collector: "agent-reach", listingUrls: ["https://www.gmanetwork.com/regionaltv/balitangbisdak"],
     feeds: [], ownership: "GMA Network, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
     regions: ["r7","r8"], languages: ["ceb","fil"], verified: false,
-    feedNote: "Only GMA's broad network RSS was returned; no desk-specific feed verified.",
+    feedNote: "No stable desk listing; covered via GMA network RSS. Probed 2026-09-27; candidate listings discover only broad network RSS.",
   },
   {
     id: "news-today-iloilo", name: "The News Today (Iloilo)", type: "regional", homepage: "https://www.thenewstoday.info",
@@ -459,10 +462,10 @@ export const FEEDS: FeedSource[] = [
     feedNote: "Fetch failed on 2026-09-27; no working feed discovered.", collector: "agent-reach", listingUrls: ["https://www.thenewstoday.info"],
   },
   {
-    id: "gma-one-western-visayas", name: "GMA Regional TV One Western Visayas", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/", collector: "agent-reach", listingUrls: ["https://www.gmanetwork.com/regionaltv/onewesternvisayas"],
+    id: "gma-one-western-visayas", name: "GMA Regional TV One Western Visayas", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/",
     feeds: [], ownership: "GMA Network, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
     regions: ["r6","nir"], languages: ["hil","fil"], verified: false,
-    feedNote: "Only GMA's broad network RSS was returned; no desk-specific feed verified.",
+    feedNote: "No stable desk listing; covered via GMA network RSS. Probed 2026-09-27; candidate listings discover only broad network RSS.",
   },
   {
     id: "visayan-daily-star", name: "Visayan Daily Star", type: "regional", homepage: "https://visayandailystar.com",
@@ -482,7 +485,7 @@ export const FEEDS: FeedSource[] = [
     id: "gma-one-mindanao", name: "GMA Regional TV One Mindanao", type: "regional", homepage: "https://www.gmanetwork.com/regionaltv/", collector: "agent-reach", listingUrls: ["https://www.gmanetwork.com/regionaltv/onemindanao"],
     feeds: [], ownership: "GMA Network, Inc.", ownershipSource: "Publisher About page", dataStatus: "feed",
     regions: ["r11","r10","r12","r9","r13"], languages: ["fil"], verified: false,
-    feedNote: "Only GMA's broad network RSS was returned; no desk-specific feed verified.",
+    feedNote: "No stable desk listing; covered via GMA network RSS. Probed 2026-09-27; candidate listings discover only broad network RSS.",
   },
   {
     id: "mindanao-gold-star-daily", name: "Mindanao Gold Star Daily", type: "regional", homepage: "https://mindanaogoldstardaily.com",

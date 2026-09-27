@@ -8,7 +8,7 @@ import { Footer } from "@/components/layout/Footer";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { SampleBanner } from "@/components/layout/SampleBanner";
 import { PublicChrome } from "@/components/admin/PublicChrome";
-import { getTrendingTopics } from "@/lib/queries";
+import { getTrendingTerms } from "@/lib/queries/trends";
 
 const newsreader = Newsreader({
   variable: "--font-newsreader",
@@ -35,7 +35,7 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const trending = (await getTrendingTopics()).map((t) => t.topic);
+  const trending = await getTrendingTerms();
   return (
     <html lang="en" className={`${newsreader.variable} ${inter.variable}`}>
       <body className="min-h-dvh">
@@ -52,7 +52,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               <header>
                 <Masthead />
                 <MainNav />
-                <TrendingTicker topics={trending} />
+                <TrendingTicker terms={trending} />
               </header>
             </>
           }

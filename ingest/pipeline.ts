@@ -4,6 +4,7 @@
  * optional LLM pass → prune old data. Records an `ingest_runs` row.
  * The first live run removes the fictional sample edition.
  */
+import { refreshTrendingTerms } from "./trends";
 import { rescreenPending } from "../lib/prescreen";
 import type { Db } from "../db/client";
 import { FEEDS } from "../config/feeds";
@@ -242,6 +243,7 @@ export async function runIngest(
     );
   }
   if (!dryRun) { try { await rescreenPending(50, db); } catch (error) { console.error("Non-fatal pending screen failure", error); } }
+  if (!dryRun) await refreshTrendingTerms(db, now);
   llm.logCounts();
   summary.durationMs = Date.now() - t0;
   return summary;
