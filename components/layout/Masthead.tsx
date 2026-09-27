@@ -1,27 +1,24 @@
 import Link from "next/link";
 import { editionDate } from "@/lib/format";
 import { Icon } from "@/components/ui";
-import { Emblem } from "@/components/ui/Emblem";
+import Image from "next/image";
 export function Masthead() {
   return (
     <div className="mx-auto max-w-[1440px] px-4 md:px-6">
-      <div className="relative grid items-center gap-4 py-5 lg:grid-cols-[1fr_1.3fr_1fr] lg:py-6">
+      <div className="relative grid items-center gap-3 py-3 md:py-5 lg:grid-cols-[1fr_1.3fr_1fr] lg:py-6">
         <p className="hidden self-start pt-2 text-[9px] uppercase tracking-wider lg:block">
           Philippines · Daily edition · {editionDate()}
         </p>
         <div className="text-center">
-          <Emblem className="mx-auto mb-2 text-forest" />
-          <Link
-            href="/"
-            aria-label="ALUNSINA NEWS — home"
-            className="block whitespace-nowrap font-serif text-[35px] font-semibold leading-none tracking-tight text-forest-dark sm:text-[52px]"
-          >
-            ALUNSINA NEWS
+          <Link href="/" aria-label="ALUNSINA NEWS — home" className="inline-flex items-center justify-center gap-3">
+            <Image src="/brand/alunsina-logo-full@2x.png" width={960} height={948} alt="ALUNSINA NEWS" priority className="hidden h-[132px] w-auto md:block" />
+            <Image src="/brand/alunsina-emblem.png" width={512} height={512} alt="" priority className="h-9 w-9 md:hidden" />
+            <Image src="/brand/alunsina-wordmark@2x.png" width={960} height={156} alt="ALUNSINA NEWS" priority className="h-6 w-auto md:hidden" />
           </Link>
-          <p className="mt-1 font-serif text-[16px]">
+          <p className="mt-2 hidden font-serif text-[16px] md:block">
             Truth has more than one source.
           </p>
-          <p className="font-serif text-sm italic text-ink-soft">
+          <p className="hidden font-serif text-sm italic text-ink-soft md:block">
             More context. A clearer picture.
           </p>
         </div>

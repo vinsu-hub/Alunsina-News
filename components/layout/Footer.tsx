@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getLastIngest, getPlatformStats } from "@/lib/queries";
 import { timeAgo } from "@/lib/format";
-import { Emblem } from "@/components/ui/Emblem";
+import Image from "next/image";
 import { NewsletterForm } from "./NewsletterForm";
 export async function Footer() {
   const [stats, last] = await Promise.all([
@@ -12,10 +12,9 @@ export async function Footer() {
     <footer className="mx-auto mt-10 max-w-[1440px] border-t border-rule px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-6 md:px-6 md:pb-5">
       <div className="grid gap-6 sm:grid-cols-3 lg:grid-cols-[1.5fr_.8fr_.8fr_.8fr_1.6fr]">
         <div>
-          <Emblem className="mb-2 text-forest" />
-          <p className="font-serif text-[28px] font-semibold text-forest">
-            ALUNSINA NEWS
-          </p>
+          <Link href="/" aria-label="ALUNSINA NEWS — home">
+            <Image src="/brand/alunsina-logo-full.png" width={480} height={474} alt="ALUNSINA NEWS" className="h-[110px] w-auto" />
+          </Link>
           <p className="mt-2 font-serif">Truth has more than one source.</p>
           <p className="mt-1 font-serif italic text-ink-soft">
             More context. A clearer picture.

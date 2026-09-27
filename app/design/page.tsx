@@ -2,6 +2,7 @@ import { CoverageChip } from "@/components/ui/CoverageChip";
 import { StoryImage } from "@/components/ui/StoryImage";
 import { Emblem } from "@/components/ui/Emblem";
 import Link from "next/link";
+import Image from "next/image";
 import {
   SOURCE_TYPES,
   SOURCE_TYPE_COLORS,
@@ -77,6 +78,7 @@ export default async function DesignPage() {
           className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-forest"
         >
           {[
+            ["logos", "Logo"],
             ["color", "Color"],
             ["type", "Typography"],
             ["labels", "Labels"],
@@ -92,6 +94,21 @@ export default async function DesignPage() {
           ))}
         </nav>
       </header>
+      <section id="logos">
+        <SectionHead title="Logo" sub="The full lockup, emblem, and wordmark on the edition’s paper and forest backgrounds." />
+        <div className="grid gap-4 md:grid-cols-2">
+          {[false, true].map((dark) => (
+            <div key={String(dark)} className={`border border-rule p-6 ${dark ? "bg-forest-dark text-paper" : "bg-paper text-ink"}`}>
+              <p className="meta mb-5">{dark ? "Forest dark" : "Paper"}</p>
+              <div className="flex flex-col items-center gap-6">
+                <Image src="/brand/alunsina-logo-full.png" width={480} height={474} alt="ALUNSINA NEWS full logo" className="h-[160px] w-auto" />
+                <Emblem className="h-16 w-16" />
+                <Image src="/brand/alunsina-wordmark.png" width={480} height={78} alt="ALUNSINA NEWS wordmark" className="h-auto w-full max-w-[280px]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
       <section id="brand">
         <SectionHead title="Emblem, CoverageChip & StoryImage" />
         <Emblem className="my-4 text-forest" />

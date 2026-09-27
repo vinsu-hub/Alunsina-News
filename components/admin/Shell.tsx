@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { Emblem } from "@/components/ui/Emblem";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Feedback } from "./Feedback";
@@ -28,6 +29,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="admin-ui admin-shell">
         <aside className="admin-sidebar">
           <Link href="/admin" className="admin-brand">
+            <Emblem className="mb-2" />
             ALUNSINA NEWS<span>EDITION DESK</span>
           </Link>
           <button

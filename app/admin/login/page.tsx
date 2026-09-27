@@ -1,4 +1,8 @@
 import { LoginForm } from "@/components/admin/Forms";
 export default function AdminLogin() {
-  return <LoginForm />;
+  return (
+    <section aria-label="ALUNSINA NEWS Edition Desk">
+      <LoginForm />
+    </section>
+  );
 }
