@@ -3,6 +3,7 @@
 Repo: /Users/vincetamis/Desktop/VARIX/Alunsina News (Next.js 16.3 App Router, React 19, Tailwind 4).
 Read first: `docs/DECISIONS.md` (authoritative decisions + reference priority), then the reference docs it lists under `docs/reference/`, `docs/BUILD_BRIEF.md` (shared modules + conventions), and `AGENTS.md` (Next 16 breaking changes: `params`/`searchParams` are Promises; check `node_modules/next/dist/docs/` when unsure).
 
+- **NEVER touch production.** `.env.local` contains the production Supabase `DATABASE_URL`. Every command you run (dev server, migrate, seed, ingest, scripts) must run with `DATABASE_URL=` (empty) so it uses local PGlite. Start the dev server as `DATABASE_URL= npx next dev -p 3100 …`. Never run `vercel` commands.
 - Dev server: a server may be running at http://localhost:3100. If it's not responding, start ONE with `npx next dev -p 3100 > /private/tmp/claude-501/-Users-vincetamis-Desktop-VARIX-Alunsina-News/2b4dd8be-ce03-4c97-ac50-b75d601ff21c/scratchpad/dev.log 2>&1 &`. Never run `next build` while other workers are active, and never start a second dev server.
 - Several workers edit this checkout in parallel. Edit ONLY the paths your task owns. Do NOT `git commit`, `git add`, `git stash`, `git checkout`, or `git reset`. The coordinator commits.
 - If you need a change outside your owned paths, don't make it. Use the Orca `ask` command from your preamble to request it, or list it in your worker_done summary.
