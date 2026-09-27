@@ -14,6 +14,9 @@ const pages = [
   "Commentary",
   "Newsletter",
   "Audit",
+  "Gov. requests",
+  "Editions",
+  "Settings",
 ];
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname(),
@@ -46,7 +49,7 @@ export function Shell({ children }: { children: ReactNode }) {
             aria-label="Admin navigation"
           >
             {pages.map((name, i) => {
-              const href = i ? `/admin/${name.toLowerCase()}` : "/admin";
+              const href = name === "Gov. requests" ? "/admin/requests" : i ? `/admin/${name.toLowerCase()}` : "/admin";
               return (
                 <Link
                   key={name}

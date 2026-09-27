@@ -151,3 +151,58 @@ export async function exportNewsletterCsv() {
 }
 export async function triggerIngest() { await assertAdminSession(); const db=await getDb(); await audit(db,'trigger','ingest',null); return runIngest(db); }
 export async function listAdminAudit(limit=100) { await assertAdminSession(); return (await getDb()).query(`SELECT * FROM admin_audit ORDER BY id DESC LIMIT $1`,[bounded(limit)]); }
+
+export interface GovernmentRequestInput {
+ receivedAt: string; requestType: string; legalBasis: string; agency?: string | null;
+ storyId?: string | null; sourceId?: string | null; summary: string; outcome: string; outcomeNote?: string; published: boolean;
+}
+export async function listAdminGovernmentRequests() {
+ await assertAdminSession();
+ return (await getDb()).query<import("./transparency").GovernmentRequest>(`SELECT * FROM gov_requests ORDER BY received_at DESC,created_at DESC`);
+}
+export async function searchGovernmentRequestTargets(search: string) {
+ await assertAdminSession(); const term=v.optionalText(search,'search',200) ?? '';
+ const db=await getDb();
+ return {stories:await db.query<{id:string;title:string}>(`SELECT id,title FROM stories WHERE title ILIKE $1 OR id=$2 ORDER BY updated_at DESC LIMIT 50`,['%'+term+'%',term]),sources:await db.query<{id:string;name:string}>(`SELECT id,name FROM sources WHERE name ILIKE $1 OR id=$2 ORDER BY name LIMIT 50`,['%'+term+'%',term])};
+}
+export async function saveGovernmentRequest(id: string | null, input: GovernmentRequestInput) {
+ await assertAdminSession();
+ const date=v.text(input.receivedAt,'received date',10);
+ if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0,10)!==date) throw new Error('Invalid received date');
+ const basis=v.choice(input.legalBasis,['court_order','informal_request','letter','other'],'legal basis');
+ const outcome=v.choice(input.outcome,['pending','not_actioned','removed_per_court_order','partially_actioned','withdrawn'],'outcome');
+ if (outcome==='removed_per_court_order' && basis!=='court_order') throw new Error('Removal requires a court order');
+ const key=id ? v.text(id,'id') : randomUUID();
+ const values=[date,v.choice(input.requestType,['removal','takedown_notice','data_request','other'],'request type'),basis,v.optionalText(input.agency,'agency',500),v.optionalText(input.storyId,'story'),v.optionalText(input.sourceId,'source'),v.text(input.summary,'summary',500),outcome,v.optionalText(input.outcomeNote,'outcome note',500) ?? '',v.bool(input.published,'published')];
+ return mutate(id?'update':'create','gov_request',key,{published:input.published,outcome},async db=>{
+  if(id) await required(db,'gov_requests','id',key);
+  return db.one(`INSERT INTO gov_requests(id,received_at,request_type,legal_basis,agency,story_id,source_id,summary,outcome,outcome_note,published) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(id) DO UPDATE SET received_at=excluded.received_at,request_type=excluded.request_type,legal_basis=excluded.legal_basis,agency=excluded.agency,story_id=excluded.story_id,source_id=excluded.source_id,summary=excluded.summary,outcome=excluded.outcome,outcome_note=excluded.outcome_note,published=excluded.published,updated_at=now() RETURNING *`,[key,...values]);
+ });
+}
+export async function getAdminIndependenceSetting() {
+ await assertAdminSession(); return (await import('./transparency')).getIndependenceSetting();
+}
+export async function saveIndependenceSetting(enabled: boolean, reviewer: string, reviewedAt: string) {
+ await assertAdminSession(); v.bool(enabled,'enabled');
+ const value={enabled,reviewer:v.optionalText(reviewer,'reviewer',200) ?? '',reviewedAt:v.optionalText(reviewedAt,'review date',10) ?? ''};
+ if(enabled && (!value.reviewer || !/^\d{4}-\d{2}-\d{2}$/.test(value.reviewedAt) || !Number.isFinite(Date.parse(value.reviewedAt)) || new Date(value.reviewedAt).toISOString().slice(0,10)!==value.reviewedAt)) throw new Error('Record counsel reviewer and valid review date before publishing');
+ return mutate('update','site_setting','independence_pledge',value,db=>db.execute(`INSERT INTO site_settings(key,value) VALUES ('independence_pledge',$1) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=now()`,[JSON.stringify(value)]));
+}
+
+/** Read-only review: all computed candidates alongside frozen placement slots. */
+export async function listAdminEditions(limit = 10) {
+  await assertAdminSession();
+  const db = await getDb();
+  const editions = await db.query<{ id: number; edition_at: string; window_label: string; created_at: string }>(
+    `SELECT * FROM editions ORDER BY edition_at DESC LIMIT $1`, [bounded(limit)]);
+  return Promise.all(editions.map(async edition => {
+    const scores = await db.query<{ story_id: string; title: string; hidden: boolean; score: number; subscores: import("@/ingest/placement").Subscores; slots: string[] }>(
+      `SELECT sc.story_id,COALESCE(s.title, sc.story_id || ' (archived)') title,COALESCE(s.hidden,true) hidden,sc.score,sc.subscores,
+        ARRAY(SELECT p.slot || ' #' || p.rank::text FROM edition_placements p WHERE p.edition_id=$1 AND p.story_id=sc.story_id ORDER BY p.slot) slots
+       FROM story_scores sc LEFT JOIN stories s ON s.id=sc.story_id WHERE sc.scored_at=$2 ORDER BY sc.score DESC,s.updated_at DESC,s.id`,
+      [edition.id,edition.created_at]);
+    const placements = await db.query<{ story_id: string; title: string; slot: string; rank: number; score: number; subscores: import("@/ingest/placement").Subscores }>(
+      `SELECT p.*,COALESCE(s.title, p.story_id || ' (archived)') title FROM edition_placements p LEFT JOIN stories s ON s.id=p.story_id WHERE edition_id=$1 ORDER BY rank,slot`, [edition.id]);
+    return { ...edition, scores, placements };
+  }));
+}

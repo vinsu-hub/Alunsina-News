@@ -390,6 +390,8 @@ export async function seed() {
     await seedContributors(db);
     await seedPitches(db);
     await seedTrendingTerms(db);
+    await db.execute(`INSERT INTO site_settings(key,value) VALUES ('independence_pledge','{"enabled":false}') ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=now()`);
+    await db.execute(`INSERT INTO gov_requests(id,received_at,request_type,legal_basis,story_id,summary,outcome,published) SELECT 'sample-gov-request',current_date,'other','informal_request',id,'Fictional sample request for admin preview only.','pending',false FROM stories ORDER BY id LIMIT 1 ON CONFLICT(id) DO UPDATE SET published=false,story_id=excluded.story_id`);
     return { sources: SOURCES.length, stories: STORIES.length, articles: STORIES.reduce((a, s) => a + s.articles.length, 0) };
   });
 }

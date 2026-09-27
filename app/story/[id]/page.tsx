@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { CoverageBar, CoverageChip, StoryImage, SaveButton, StatusKicker } from "@/components/ui";
 import { PhilippineCoverage } from "@/components/coverage/PhilippineCoverage";
 import { getRegionCoverage, getStory, getStoryCommentary, getRelatedStories } from "@/lib/queries";
+import { hasGovernmentRequest } from "@/lib/queries/transparency";
+import Link from "next/link";
 import { plural, timeAgo } from "@/lib/format";
 import { CompareProvider, CompareSlot, CompareToggle } from "@/components/story/CompareMode";
 import { CompareView } from "@/components/story/CompareView";
@@ -37,6 +39,7 @@ export default async function StoryPage({ params }: PageProps<"/story/[id]">) {
   const story = await getStory(id);
   if (!story) notFound();
 
+  const governmentRequest = await hasGovernmentRequest(story.id);
   const firstReported = earliest(story.articles) ?? story.createdAt;
   const [platformCoverage, commentary, related] = await Promise.all([getRegionCoverage({ sinceHours: 48 }), getStoryCommentary(story.id), getRelatedStories(story.id)]);
   const path = `/story/${story.id}`;
@@ -46,6 +49,7 @@ export default async function StoryPage({ params }: PageProps<"/story/[id]">) {
       <article className="mx-auto max-w-[1280px] px-4 pb-12 pt-6 md:px-6 md:pt-10">
         {/* 1. Story header */}
         <header className="border-b border-ink pb-6">
+          {governmentRequest && <p className="mb-4 border-y border-rule py-3 font-sans text-sm text-ink-soft">This story has been the subject of a government content request. <Link href="/methodology#government-requests" className="link-quiet">See ALUNSINA&apos;s Transparency Report →</Link></p>}
           <div className="flex flex-wrap items-center gap-3">
             <span className="kicker text-forest">{story.topic}</span>
             <StatusKicker status={story.status} />

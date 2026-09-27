@@ -3,7 +3,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { SourceTypeBadge } from "@/components/ui";
 import { CONTAINER } from "@/components/explore/PageHeader";
-import { BLINDSPOT_RULES, CLUSTERING, RELATED_STORIES } from "@/lib/thresholds";
+import { getIndependenceSetting, listGovernmentRequests } from "@/lib/queries/transparency";
+import { BLINDSPOT_RULES, CLUSTERING, RELATED_STORIES, PLACEMENT } from "@/lib/thresholds";
 import { BLINDSPOT_TYPES, DATA_STATUSES, SOURCE_TYPES } from "@/lib/taxonomy";
 
 export const metadata: Metadata = {
@@ -27,6 +28,8 @@ const TOC = [
   ["pitch-board", "Pitch Board"],
   ["magnified", "Magnified News"],
   ["principles", "Editorial principles"],
+  ["placement", "Headline & briefing placement"],
+  ["government-requests", "Government Request Log"],
 ] as const;
 
 const PRINCIPLES = [
@@ -59,7 +62,10 @@ function Section({ id, n, title, children }: { id: string; n: number; title: str
   );
 }
 
-export default function MethodologyPage() {
+export default async function MethodologyPage() {
+  const [requests,pledge]=await Promise.all([listGovernmentRequests(),getIndependenceSetting()]);
+  const contents: readonly (readonly [string,string])[] = pledge.enabled ? [...TOC,['independence-pledge','Editorial Independence Pledge']] : TOC;
+
   return (
     <div className={`${CONTAINER} pt-8 md:pt-12`}>
       <header className="border-b border-ink pb-6">
@@ -78,7 +84,7 @@ export default function MethodologyPage() {
         <nav aria-label="On this page" className="sticky top-0 z-20 min-w-0 self-start bg-paper py-2 lg:top-6">
           <p className="kicker border-b border-ink pb-1 text-ink">Contents</p>
           <ol className="no-scrollbar mt-1 flex gap-4 overflow-x-auto font-sans text-[13px] lg:block">
-            {TOC.map(([id, label], i) => (
+            {contents.map(([id, label], i) => (
               <li key={id} className="shrink-0 border-b border-rule/60 lg:shrink">
                 <a href={`#${id}`} className="flex gap-2 py-1.5 text-ink-soft hover:text-ink">
                   <span className="tabular-nums text-ink-muted">{String(i + 1).padStart(2, "0")}</span>
@@ -289,6 +295,15 @@ export default function MethodologyPage() {
               ))}
             </ol>
           </Section>
+          <Section id="placement" n={12} title="Headline & briefing placement">
+            <p>{PLACEMENT.text}</p>
+            <ul className="list-disc space-y-2 pl-5"><li>Source count, log-scaled.</li><li>Source-type diversity across the nine types.</li><li>Regional reach: distinct regions using Coverage and Blindspot region data.</li><li>Recency decay since the last update.</li><li>An open Related Stories chain bump, which earns the DEVELOPING tag.</li></ul>
+            <p><strong>Clicks and engagement are never a factor.</strong> Click-through rate, time-on-page, virality, and other engagement metrics are excluded.</p>
+          </Section>
+          <Section id="government-requests" n={13} title="Government Request Log">
+            {requests.length===0 ? <p>No government content requests have been received.</p> : <div className="overflow-x-auto"><table className="w-full border-collapse text-left font-sans text-sm"><caption className="sr-only">Published government content requests</caption><thead><tr>{['Date','Request type','Story / Source','Outcome','Agency'].map(label=><th key={label} scope="col" className="border-b border-ink p-2 align-top">{label}</th>)}</tr></thead><tbody>{requests.map(row=><tr key={row.id}><td className="border-b border-rule p-2 align-top">{row.received_at.slice(0,10)}</td><td className="border-b border-rule p-2 align-top">{row.request_type.replaceAll('_',' ')}<p className="mt-2 text-ink-muted">{row.summary}</p></td><td className="border-b border-rule p-2 align-top">{row.story_title && <Link className="link-quiet" href={`/story/${row.story_id}`}>{row.story_title}</Link>}{row.source_name && <p><Link className="link-quiet" href={`/sources/${row.source_id}`}>{row.source_name}</Link></p>}{!row.story_title && !row.source_name && 'Not linked'}</td><td className="border-b border-rule p-2 align-top">{row.outcome.replaceAll('_',' ')}{row.outcome_note && <p className="mt-2 text-ink-muted">{row.outcome_note}</p>}</td><td className="border-b border-rule p-2 align-top">{row.agency ?? 'Not recorded'}</td></tr>)}</tbody></table></div>}
+          </Section>
+          {pledge.enabled && <Section id="independence-pledge" n={14} title="Editorial Independence Pledge"><p>ALUNSINA removes content only in response to valid legal process: a court order, not an informal request. Criticism of a public official is never, by itself, grounds for removal. Where ALUNSINA&apos;s Coverage reflects reporting already published by accredited Philippine outlets, taking it down here doesn&apos;t erase that reporting. If ALUNSINA ever receives a government request to remove a Story, it is evaluated against this standard and logged publicly in the Government Request Log below, whatever the outcome.</p></Section>}
         </article>
       </div>
     </div>
